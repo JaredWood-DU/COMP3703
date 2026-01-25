@@ -1,2 +1,4 @@
 /lectures
 /resources
+*.csv
+*.keras
