@@ -1,0 +1,45 @@
+---------- DELIVERABLE 1 ---------------------------------------------------------------------------
+WHAT TO INCLUDE:
+- Sample sizes tested
+- Corresponding accuracy values
+- Brief interpretation (e.g., stability, variance, confidence)
+
+RESPONSE:
+- 
+---------- DELIVERABLE 2 ---------------------------------------------------------------------------
+WHAT TO INCLUDE:
+- Brief description of why these examples were chosen
+- At least one observed success case
+- At least one observed failure case (if available)
+
+RESPONSE:
+- 
+---------- DELIVERABLE 3 ---------------------------------------------------------------------------
+WHAT TO INCLUDE:
+- Hyperparameter values used
+- Training time comparison
+- Accuracy comparison
+- Short justification for which configuration you would select and why
+
+RESPONSE:
+- 
+---------- DELIVERABLE 4 ---------------------------------------------------------------------------
+WHAT TO INCLUDE:
+- Description of regularization technique used
+- Training vs. validation accuracy comparison
+- Clear statement on whether overfitting was reduced
+- Trade-offs observed (e.g., slower convergence, lower peak accuracy)
+
+RESPONSE:
+- 
+---------- DELIVERABLE 5 ---------------------------------------------------------------------------
+WHAT TO INCLUDE:
+- Interpretation of curve shapes
+- Identification of:
+    - Overfitting
+    - Underfitting
+    - Convergence behavior
+- Explanation of how your earlier design choices influenced these curves
+
+RESPONSE:
+- 
