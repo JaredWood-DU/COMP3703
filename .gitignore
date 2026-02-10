@@ -3,3 +3,4 @@
 *.csv
 *.keras
 *.requirements.txt
+template*
