@@ -15,17 +15,27 @@ FILE CONTENTS:
 - File Overview, Imports, Global Variables
 - Acquire Dataset Functions
     - download_raw
-    - create_raw_short
+    - load_dataset
+    - create_short
 - Prepare Dataset Functions
     - diag_missing_values
     - handle_missing_values
+    - export_to_parquet
+    - remove_csv_files
 - Main Function
 """
 # ----- Imports -----------------------------------------------------------------------------------
+# Pathing and renaming files
 import os
+
+# Databasing
 import numpy as np
 import pandas as pd
+
+# Reducing dataset
 from sklearn.model_selection import train_test_split
+
+# Pull original dataset
 import kagglehub
 
 # ----- Global Variables --------------------------------------------------------------------------
@@ -93,9 +103,9 @@ def download_raw(filename:str='raw_full.csv') -> None:
               f'{e}')
 
 
-def create_raw_short(
-        full_raw_filename:str='raw_full.csv',
-        filename:str='raw_short.csv',
+def create_short(
+        full_raw_filename:str='raw_full.parquet',
+        filename:str='raw_short.parquet',
         reduction_percent:float=0.10,
         target_variable:str='Attack') -> None:
     '''
@@ -103,15 +113,16 @@ def create_raw_short(
     -----
     - Creates a shorter version of [full_raw_filename] as [filename] that is [reduction_percent] of [full_raw_filename]
     - Will check to see if [filename] exists first, if not, calls download_raw()
-    - Uses pandas dataframe to stratify across the target variable, in this case, 
+    - Uses pandas dataframe to stratify across the target variable, in this case, Attack
+    - This will by default expect a parquet and create a parquet file
 
     Parameters
     ----------
     - full_raw_filename (str): 
-        - Default: raw_full.csv
+        - Default: raw_full.parquet
         - The name of complete dataset in the current working directory to be reduced
     - filename (str):
-        - Default: raw_short.csv
+        - Default: raw_short.parquet
         - The name of the reduced dataset in the current working directory
     - reduction_percent (float): 
         - Default: 0.10
@@ -153,25 +164,31 @@ def create_raw_short(
         print('\033[33m'
               f'{full_raw_filename} exists, attempting to create reduced version as {filename}...'
               '\033[0m')
-        raw_df = pd.read_csv(full_raw_filename)
+        full_df = pd.read_parquet(full_raw_filename)
+        print('\033[33m'
+              f'{full_raw_filename} read into Pandas DataFrame, checking if {target_variable} exists as a column...'
+              '\033[0m')
 
         # Check if the target_variable exists first
-        if target_variable not in raw_df.columns:
+        if target_variable not in full_df.columns:
             raise KeyError('\033[31m'
                            f'{target_variable} does not exist in the column names of {full_raw_filename}!'
-                           f'Detected Column Names: {list(raw_df.columns)}'
+                           f'Detected Column Names: {list(full_df.columns)}'
                            '\033[0m')
+        print('\033[33m'
+              f'{target_variable} exists, creating reduced Pandas DataFrame...'
+              '\033[0m')
         
-        # Split raw_df into the reduced_df using sklearn's function
+        # Split full_df into the reduced_df using sklearn's function
         _, reduced_df = train_test_split(
-            raw_df,
+            full_df,
             test_size=reduction_percent,
-            stratify=raw_df[target_variable],
+            stratify=full_df[target_variable],
             random_state=3703
         )
 
         # Export the reduced dataset as [filename]
-        pd.DataFrame.to_csv(reduced_df, path_or_buf=filename)
+        pd.DataFrame.to_parquet(reduced_df, path=filename)
         print('\033[32m'
               f'Successfully reduced {full_raw_filename} into {filename} at {reduction_percent*100}% the original size and stratified over {target_variable}!'
               '\033[0m')
@@ -190,7 +207,7 @@ def create_raw_short(
 # START Prepare Dataset Functions
 # =================================================================================================
 
-def diag_missing_values(pdDataFrame:pd.DataFrame=None, dataFileName:str='raw_short.csv') -> pd.DataFrame:
+def diag_missing_values(pdDataFrame:pd.DataFrame=None, dataFileName:str='raw_full.parquet') -> pd.DataFrame:
     '''
     About
     -----
@@ -222,7 +239,7 @@ def diag_missing_values(pdDataFrame:pd.DataFrame=None, dataFileName:str='raw_sho
         - If not None, will use this to perform the diagnosis and produce results
         - If None, [dataFileName] will be used to create the Pandas DataFrame
     - dataFileName (str):
-        - Default: raw_short.csv
+        - Default: raw_full.parquet
         - The filename to search for locally to create [pdDataFrame] if necessary
 
     Returns
@@ -233,7 +250,7 @@ def diag_missing_values(pdDataFrame:pd.DataFrame=None, dataFileName:str='raw_sho
         - Whatever Pandas DataFrame that was used during the diagnosis
     '''
     # ----- Check If pdDataFrame Is Given ---------------------------------------------------------
-    if not pdDataFrame:
+    if pdDataFrame is None:
         print('\033[33m'
               f'pdDataFrame not provided, attempting to create Pandas DataFrame using {dataFileName}...'
               '\033[0m')
@@ -244,7 +261,7 @@ def diag_missing_values(pdDataFrame:pd.DataFrame=None, dataFileName:str='raw_sho
                                         f'Unable to find {dataFileName}, cannot establish pdDataFrame!\n'
                                         f'Current working directory: {os.getcwd()}'
                                         '\033[0m')
-            pdDataFrame = pd.read_csv(dataFileName)
+            pdDataFrame = pd.read_parquet(dataFileName)
         
         except Exception as e:
             print('\033[31m'
@@ -331,7 +348,7 @@ def diag_missing_values(pdDataFrame:pd.DataFrame=None, dataFileName:str='raw_sho
     return pdDataFrame
 
 
-def handle_missing_values(pdDataFrame:pd.DataFrame, filename:str='prepared_short.csv') -> None:
+def handle_missing_values(pdDataFrame:pd.DataFrame, filename:str='prepared_full.parquet') -> None:
     '''
     About
     -----
@@ -341,13 +358,14 @@ def handle_missing_values(pdDataFrame:pd.DataFrame, filename:str='prepared_short
         - IPV4_SRC_ADDR: 0.0.0.0 detected
         - IPV4_DST_ADDR: 0.0.0.0 detected
     - Nothing will be adjusted from the raw files since there could be a correlation with bad IPs and malicious activity
+    - This diag result is seen both in the short and full versions of the dataset
 
     Parameters
     ----------
     - pdDataFrame (pd.DataFrame):
         - The Pandas DataFrame to prepare accordingly and save as [filename] to load in prepared datasets in the future
     - filename (str):
-        - Default: prepared_short.csv
+        - Default: prepared_full.parquet
         - The name of the prepared dataset to be loaded later
 
     Returns
@@ -367,7 +385,7 @@ def handle_missing_values(pdDataFrame:pd.DataFrame, filename:str='prepared_short
         print('\033[33m'
             f'Attempting to create the prepared dataset as {filename}...'
             '\033[0m')
-        pd.DataFrame.to_csv(pdDataFrame, path_or_buf=filename)
+        pd.DataFrame.to_parquet(pdDataFrame, path=filename)
         print('\033[32m'
             f'Successfully created the prepared dataset {filename}'
             '\033[0m')
@@ -379,6 +397,96 @@ def handle_missing_values(pdDataFrame:pd.DataFrame, filename:str='prepared_short
               '\033[0m'
               f'{e}')
 
+
+def export_to_parquet(pdDataFrame:pd.DataFrame, filename:str='raw_full.parquet') -> None:
+    '''
+    About
+    -----
+    - Exports [pdDataFrame] as a parquet datafile named [filename]
+    - This is intended to speed up intialization of a pandas dataframe
+    - This reduces the load time from a csv file almost by 90%
+
+    Parameters
+    ----------
+    - pdDataFrame (pd.DataFrame):
+        - The Pandas DataFrame to be exported into a parquet datafile as [filename]
+    - filename (str):
+        - Default: "raw_full.parquet"
+        - The name of the exported parquet file
+
+    Returns
+    -------
+    - FILE CREATION:
+        - Creates the parquet file with [filename] from the [pdDataFrame]
+    '''
+    # ----- Check If filename Exists --------------------------------------------------------------
+    if os.path.exists(filename):
+        print('\033[32m'
+              f'{filename} already exists!  No need to re-create it!'
+              '\033[0m')
+        return
+    
+    # ----- Export pdDataFrame to Parquet DataFile ------------------------------------------------
+    print('\033[33m'
+          f'Attempting to export Pandas Dataframe to {filename}...'
+          '\033[0m')
+    try:
+        pdDataFrame.to_parquet(filename)
+        print('\033[32m'
+              f'Successfully exported Pandas Dataframe to {filename}!'
+              '\033[0m')
+        
+    except Exception as e:
+        print('\033[31m'
+              f'Failed to export Pandas Dataframe to {filename}!\n'
+              'Exception:'
+              '\033[0m'
+              f'{e}')
+
+
+def remove_csv_files(filenames:list[str]=['raw_full.csv', 'raw_short.csv']) -> None:
+    '''
+    About
+    -----
+    - Attempts to remove any [filenames] from the local directory
+
+    Parameters
+    ----------
+    - filenames (list[str]):
+        - Default: ["raw_full.csv", "raw_short.csv"]
+        - List of filenames and their extensions to remove
+
+    Returns
+    -------
+    - FILE DELETION
+        - Attempts to delete any [filenames] that exist in the local directory
+    '''
+    # Start iteration
+    for filename in filenames:
+
+        # ----- Check If filename Does Not Exist --------------------------------------------------
+        if not os.path.exists(filename):
+            print('\033[36m'
+                  f'{filename} not detected, moving to next file...'
+                  '\033[0m')
+            continue
+
+        # ----- Otherwise, Delete filename --------------------------------------------------------
+        else:
+            print('\033[33m'
+                  f'Attempting to delete {filename}...'
+                  '\033[0m')
+            try:
+                os.remove(filename)
+                print('\033[32m'
+                      f'Successfully removed {filename}!'
+                      '\033[0m')
+            
+            except Exception as e:
+                print('\033[31m'
+                      f'Failed to remove {filename}!'
+                      '\033[0m')
+
 # =================================================================================================
 # END Prepare Dataset Functions
 # START Main Function
@@ -388,22 +496,37 @@ def main():
     '''
     About
     -----
-    - Simply just runs the entire wrangle process from start to finish with default values
+    - Runs the acquire and preparation phases without the diagnosis section
     - Acquire:
         - download_raw()
-        - create_raw_short()
+        - export_to_parquet()
+        - create_short()
     - Prepare:
-        - diag_missing_values()
         - handle_missing_values()
 
     Returns
     -------
     - Everything from start to finish in the wrangle process
     '''
+    # ----- Initial Dataset Acquisition -----------------------------------------------------------
     download_raw()
-    create_raw_short()
-    df = diag_missing_values()
+
+    # ----- Export To Parquet Datasets ------------------------------------------------------------
+    df = pd.read_csv('raw_full.csv')
+    export_to_parquet(df)
+    create_short()
+
+    # ----- Export Raw To Prepared Datasets -------------------------------------------------------
     handle_missing_values(df)
+    short_df = pd.read_parquet('raw_short.parquet')
+    handle_missing_values(short_df, 'prepared_short.parquet')
+
+    # ----- Remove csv Datasets -------------------------------------------------------------------
+    remove_csv_files()
+
+    # ----- Remove raw.parquet Files --------------------------------------------------------------
+    parquet_files = ['raw_full.parquet', 'raw_short.parquet']
+    remove_csv_files(filenames=parquet_files)
 
 # =================================================================================================
 # END Main Function

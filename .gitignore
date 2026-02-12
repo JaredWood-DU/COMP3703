@@ -1,6 +1,7 @@
 /lectures
 /resources
 *.csv
+*.parquet
 *.keras
 *.requirements.txt
 template*
