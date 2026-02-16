@@ -19,8 +19,9 @@ from imutils import paths
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
 from helpers import resize_to_fit
+import matplotlib.pyplot as plt
 
 
 LETTER_IMAGES_FOLDER = "extracted_letter_images"
@@ -31,6 +32,7 @@ MODEL_LABELS_FILENAME = "model_labels.dat"
 parser = argparse.ArgumentParser(description="Train CAPTCHA letter recognition model")
 parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs")
 parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
+parser.add_argument("--dropout", type=float, default=0, help="Percentage of connections to drop during model training")
 args = parser.parse_args()
 
 # initialize the data and labels
@@ -90,6 +92,8 @@ model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
 # Hidden layer with 500 nodes
 model.add(Flatten())
 model.add(Dense(500, activation="relu"))
+if args.dropout != 0:
+    model.add(Dropout(args.dropout))
 
 # Output layer with 32 nodes (one for each possible letter/number we predict)
 model.add(Dense(32, activation="softmax"))
@@ -110,3 +114,27 @@ print(f"[REPORT] Final validation accuracy: {final_val_acc}")
 
 # Save the trained model to disk
 model.save(MODEL_FILENAME)
+
+# Create the output directory if it doesn't exist
+plot_dir = os.path.join("outputs", "training_curves")
+os.makedirs(plot_dir, exist_ok=True)
+
+# --- Plot Accuracy Curve ---
+plt.figure()
+plt.plot(history.history['accuracy'], label='train_acc')
+plt.plot(history.history['val_accuracy'], label='val_acc')
+plt.title('Training and Validation Accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.savefig(os.path.join(plot_dir, "accuracy_curve.png"))
+
+# --- Plot Loss Curve ---
+plt.figure()
+plt.plot(history.history['loss'], label='train_loss')
+plt.plot(history.history['val_loss'], label='val_loss')
+plt.title('Training and Validation Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.savefig(os.path.join(plot_dir, "loss_curve.png"))

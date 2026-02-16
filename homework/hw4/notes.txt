@@ -1,10 +1,4 @@
 ---------- DELIVERABLE 1 ---------------------------------------------------------------------------
-WHAT TO INCLUDE:
-- Sample sizes tested
-- Corresponding accuracy values
-- Brief interpretation (e.g., stability, variance, confidence)
-
-RESPONSE:
 - Sample sizes and accuracy scores
     - 5, Accuracy=1.000
     - 50, Accuracy=1.000
@@ -18,35 +12,48 @@ RESPONSE:
       Otherwise, it still performed very well.
       The python file denotes skips are CAPTCHAS that do not have 4 characters or failed to parse
 
----------- DELIVERABLE 2 ---------------------------------------------------------------------------
-WHAT TO INCLUDE:
-- Brief description of why these examples were chosen
-- At least one observed success case
-- At least one observed failure case (if available)
 
-RESPONSE:
+
+
+
+---------- DELIVERABLE 2 ---------------------------------------------------------------------------
 - These were just 5 randomly selected images
 - All 5 images were a successful prediction
 - No failure case was observed
 
+
+
+
+
 ---------- DELIVERABLE 3 ---------------------------------------------------------------------------
-WHAT TO INCLUDE:
-- Hyperparameter values used
-- Training time comparison
-- Accuracy comparison
-- Short justification for which configuration you would select and why
+- Defaulted Model (epoch=10, batch_size=32)
+    - Training Time: 230-seconds
+    - Accuracy: 0.9997
+- Halved Model (epoch=5, batch_size=16)
+    - Training Time: 144-seconds
+    - Accuracy: 0.9989
+- Given the small resource requirements for the models, I would use the defaulted model since it had higher accuracy
 
-RESPONSE:
-- 
+
+
+
+
 ---------- DELIVERABLE 4 ---------------------------------------------------------------------------
-WHAT TO INCLUDE:
-- Description of regularization technique used
-- Training vs. validation accuracy comparison
-- Clear statement on whether overfitting was reduced
-- Trade-offs observed (e.g., slower convergence, lower peak accuracy)
+- Dropout (Percentage of connections to remove during training)
+- Defaulted Model (--epochs=10, --batch_size=32)
+    - Accuracy: 0.9988
+    - Validation: 0.9968
+- Dropout Model (--epochs=10, --batch_size=32, --dropout=0.10)
+    - Accuracy: 1.000
+    - Validation: 0.9991
+- Overfitting is reduced? (Absolute value between tests is less in the 10% dropout)
+- Validation in both models were slightly less than the accuracy
+- Appears that dropping connections will keep performance more consistent with train/val scores than less dropped connections
 
-RESPONSE:
-- 
+
+
+
+
 ---------- DELIVERABLE 5 ---------------------------------------------------------------------------
 WHAT TO INCLUDE:
 - Interpretation of curve shapes
@@ -57,4 +64,10 @@ WHAT TO INCLUDE:
 - Explanation of how your earlier design choices influenced these curves
 
 RESPONSE:
-- 
+- Validation curves in both graphs are fairly straight across epochs.
+  Training curves have a steep increase/decrease in the first epoch before leveling out.
+  In accuracy, validation has a slight increase and a slight decrease in loss.
+  A similar mirror effect is seen with the training curves.
+- Arguably, epoch 4 may be a sign of the worst case of overfitting and later epochs helped reduce this affect.
+  It appears that both accuracy/loss converged near epoch 1, 3, and 6
+- The dropout may have helped remove connections that were overfit towards the training data and not a good overall generalization of the general data
