@@ -27,7 +27,7 @@ CAPTCHA_IMAGE_FOLDER = "generated_captcha_images"
 # Argument parsing for evaluation
 parser = argparse.ArgumentParser(description="Solve CAPTCHAs with trained model")
 parser.add_argument("--image-folder", default=CAPTCHA_IMAGE_FOLDER, help="Folder containing CAPTCHA images")
-parser.add_argument("--samples", type=int, default=10, help="Number of random CAPTCHA images to evaluate")
+parser.add_argument("--num_samples", type=int, default=10, help="Number of random CAPTCHA images to evaluate")
 parser.add_argument("--save-outputs", action="store_true", help="Save annotated outputs to ./outputs/")
 args = parser.parse_args()
 
@@ -48,11 +48,11 @@ captcha_image_files = list(paths.list_images(CAPTCHA_IMAGE_FOLDER))
 if len(captcha_image_files) == 0:
     raise SystemExit(f"No images found in {CAPTCHA_IMAGE_FOLDER}")
 
-if len(captcha_image_files) < args.samples:
-    print(f"[WARN] Requested {args.samples} samples but only {len(captcha_image_files)} available. Using all.")
+if len(captcha_image_files) < args.num_samples:
+    print(f"[WARN] Requested {args.num_samples} samples but only {len(captcha_image_files)} available. Using all.")
     sample_size = len(captcha_image_files)
 else:
-    sample_size = args.samples
+    sample_size = args.num_samples
 
 captcha_image_files = np.random.choice(captcha_image_files, size=(sample_size,), replace=False)
 
@@ -117,6 +117,17 @@ for image_file in captcha_image_files:
     # didn't work correcly. Skip the image instead of saving bad training data!
     if len(letter_image_regions) != 4:
         num_skipped += 1
+        if args.save_outputs:
+            # Define specific folder for failures
+            failure_dir = os.path.join("outputs", "failures")
+            os.makedirs(failure_dir, exist_ok=True)
+            
+            # Save off failure information
+            gt = os.path.splitext(os.path.basename(image_file))[0]
+            fail_filename = f"{gt}_found_{len(letter_image_regions)}.png"
+            cv2.imwrite(os.path.join(failure_dir, fail_filename), thresh)
+            
+        print(f"[INFO] Skipping {image_file}: Found {len(letter_image_regions)} regions.")
         continue
 
     # Sort the detected letter images based on the x coordinate to make sure
@@ -165,13 +176,35 @@ for image_file in captcha_image_files:
         num_correct += 1
 
     if args.save_outputs:
-        os.makedirs("outputs", exist_ok=True)
-        output_path = os.path.join("outputs", f"{gt}_pred.png")
-        cv2.imwrite(output_path, output)
+        # Create specific subfolder for this CAPTCHA
+        target_dir = os.path.join("outputs", "annotated_examples", gt)
+        os.makedirs(target_dir, exist_ok=True)
+
+        # Save original CAPTCHA
+        original = cv2.imread(image_file)
+        cv2.imwrite(os.path.join(target_dir, "1_original.png"), original)
+
+        # Save predicted CAPTCHA
+        is_correct = (captcha_text == gt)
+        status_text = "CORRECT" if is_correct else "INCORRECT"
+        status_color = (0, 255, 0) if is_correct else (0, 0, 255)
+        
+        cv2.putText(output, f"GT: {gt}", (5, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 0, 0), 2)
+        cv2.putText(output, status_text, (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.45, status_color, 2)
+        
+        cv2.imwrite(os.path.join(target_dir, "2_prediction.png"), output)
+
+        # Save extracted characters of CAPTCHA
+        for i, letter_bounding_box in enumerate(letter_image_regions):
+            x, y, w, h = letter_bounding_box
+            # Extract character from 'image' (grayscale version used for segmentation)
+            character_roi = image[y - 2:y + h + 2, x - 2:x + w + 2]
+            char_filename = f"char_{i+1}_{predictions[i]}.png"
+            cv2.imwrite(os.path.join(target_dir, char_filename), character_roi)
 
     # Show the annotated image
     cv2.imshow("Output", output)
-    cv2.waitKey()
+    cv2.waitKey(1)
 
 # Final report
 if num_total > 0:

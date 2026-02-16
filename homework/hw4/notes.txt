@@ -5,7 +5,19 @@ WHAT TO INCLUDE:
 - Brief interpretation (e.g., stability, variance, confidence)
 
 RESPONSE:
-- 
+- Sample sizes and accuracy scores
+    - 5, Accuracy=1.000
+    - 50, Accuracy=1.000
+    - 500, Accuracy=0.984
+        - Evaluated: 487
+        - Correct: 479
+        - Skipped: 13
+- Interpretation
+    - Very accurate performing model, but skipped 13 images in a larger sample size.
+      Maybe this is caused because a 1, I, O, or appeared in the CAPTCHA.
+      Otherwise, it still performed very well.
+      The python file denotes skips are CAPTCHAS that do not have 4 characters or failed to parse
+
 ---------- DELIVERABLE 2 ---------------------------------------------------------------------------
 WHAT TO INCLUDE:
 - Brief description of why these examples were chosen
@@ -13,7 +25,10 @@ WHAT TO INCLUDE:
 - At least one observed failure case (if available)
 
 RESPONSE:
-- 
+- These were just 5 randomly selected images
+- All 5 images were a successful prediction
+- No failure case was observed
+
 ---------- DELIVERABLE 3 ---------------------------------------------------------------------------
 WHAT TO INCLUDE:
 - Hyperparameter values used
