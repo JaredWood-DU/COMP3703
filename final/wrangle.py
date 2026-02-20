@@ -327,6 +327,10 @@ def diag_missing_values(pdDataFrame:pd.DataFrame=None, dataFileName:str='raw_ful
         print('\033[32m'
               'No duplicates found!'
               '\033[0m')
+    else:
+        print('\033[32m'
+              f'Duplicates found: {duplicates}'
+              '\033[0m')
         
     # Print off all information
     for col in diagDict:
