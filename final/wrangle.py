@@ -328,7 +328,7 @@ def diag_missing_values(pdDataFrame:pd.DataFrame=None, dataFileName:str='raw_ful
               'No duplicates found!'
               '\033[0m')
     else:
-        print('\033[32m'
+        print('\033[33m'
               f'Duplicates found: {duplicates}'
               '\033[0m')
         
@@ -352,30 +352,30 @@ def diag_missing_values(pdDataFrame:pd.DataFrame=None, dataFileName:str='raw_ful
     return pdDataFrame
 
 
-def handle_missing_values(pdDataFrame:pd.DataFrame, filename:str='prepared_full.parquet') -> None:
+def handle_missing_values(pdDataFrame:pd.DataFrame, filename:str='clean_full.parquet') -> None:
     '''
     About
     -----
-    - From exploration of diag_missing_values(), this specifically handles what was detected
+    - From exploration of diag_missing_values(), this specifically handles what was detected along with normalization
     - From diag_missing_values():
-        - No duplicates
+        - Remove duplicates
+        - Normalize feature names
+        - Normalize all categorical feature entries
         - IPV4_SRC_ADDR: 0.0.0.0 detected
         - IPV4_DST_ADDR: 0.0.0.0 detected
-    - Nothing will be adjusted from the raw files since there could be a correlation with bad IPs and malicious activity
-    - This diag result is seen both in the short and full versions of the dataset
 
     Parameters
     ----------
     - pdDataFrame (pd.DataFrame):
-        - The Pandas DataFrame to prepare accordingly and save as [filename] to load in prepared datasets in the future
+        - The Pandas DataFrame to prepare accordingly and save as [filename] to load in clean datasets in the future
     - filename (str):
-        - Default: prepared_full.parquet
-        - The name of the prepared dataset to be loaded later
+        - Default: clean_full.parquet
+        - The name of the clean dataset to be loaded later
 
     Returns
     -------
     - DATA FILES
-        - [filename] is the prepared dataset saved locally
+        - [filename] is the clean dataset saved locally
     '''
     # ----- Check If filename Already Exists ------------------------------------------------------
     if os.path.exists(filename):
@@ -384,19 +384,30 @@ def handle_missing_values(pdDataFrame:pd.DataFrame, filename:str='prepared_full.
               '\033[0m')
         return
 
-    # ----- Create Prepared filename --------------------------------------------------------------
+    # ----- Create Clean filename --------------------------------------------------------------
     try:
         print('\033[33m'
-            f'Attempting to create the prepared dataset as {filename}...'
+            f'Attempting to create the clean dataset as {filename}...'
             '\033[0m')
+        
+        # Remove duplicates
+        pdDataFrame = pdDataFrame.drop_duplicates()
+
+        # Normalize all feature column names
+        pdDataFrame.columns = [col.strip().lower().replace(' ', '_') for col in pdDataFrame.columns]
+
+        # Normalize all object and str dtype features entries to avoid particularly double entries of the same attack type
+        pdDataFrame = pdDataFrame.apply(lambda col: col.astype(str).str.strip().str.lower().str.replace(' ', '_') if (col.dtype == "object" or col.dtype == "str") else col)
+
+        # Export to parquet datafile
         pd.DataFrame.to_parquet(pdDataFrame, path=filename)
         print('\033[32m'
-            f'Successfully created the prepared dataset {filename}'
+            f'Successfully created the clean dataset {filename}'
             '\033[0m')
         
     except Exception as e:
         print('\033[31m'
-              'Failed to create prepared dataset!\n'
+              'Failed to create clean dataset!\n'
               'Exception:'
               '\033[0m'
               f'{e}')
@@ -505,7 +516,7 @@ def main():
         - download_raw()
         - export_to_parquet()
         - create_short()
-    - Prepare:
+    - Clean Data:
         - handle_missing_values()
 
     Returns
@@ -520,10 +531,10 @@ def main():
     export_to_parquet(df)
     create_short()
 
-    # ----- Export Raw To Prepared Datasets -------------------------------------------------------
+    # ----- Export Raw To Clean Datasets -------------------------------------------------------
     handle_missing_values(df)
     short_df = pd.read_parquet('raw_short.parquet')
-    handle_missing_values(short_df, 'prepared_short.parquet')
+    handle_missing_values(short_df, 'clean_short.parquet')
 
     # ----- Remove csv Datasets -------------------------------------------------------------------
     remove_csv_files()
