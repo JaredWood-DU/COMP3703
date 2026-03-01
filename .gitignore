@@ -1,6 +1,7 @@
 /lectures
 */resources
 */complexNetworkArticles
+*/datasets
 *.csv
 *.parquet
 *.keras
