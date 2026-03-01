@@ -1,6 +1,8 @@
 /lectures
 /resources
+/complexNetworkArticles
 *.csv
+*.parquet
 *.keras
 *.requirements.txt
 template*
