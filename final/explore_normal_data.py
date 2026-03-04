@@ -383,7 +383,7 @@ def vis_categorical(pdDataFrame:pd.DataFrame, col_for_comparison: str, target: s
     
     plt.title(f'Categorical Signature: {col_for_comparison} vs {target}')
     plt.ylabel('Attack Type (Global Distribution %)')
-    plt.xlabel(f'{col_for_comparison} (Local Distribution %)')
+    plt.xlabel(f'{col_for_comparison} (Global Distribution %)')
     plt.tight_layout()
     plt.show()
 
