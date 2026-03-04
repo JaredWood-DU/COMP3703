@@ -26,6 +26,7 @@ FILE CONTENTS:
 - Visualization Functions
     - vis_target_dist
     - vis_numerical
+    - vis_categorical
     - vis_cramer
     - vis_mutual_information
 - Miscellaneous Helper Functions
@@ -264,15 +265,19 @@ def vis_numerical(pdDataFrame:pd.DataFrame, col_for_comparison:str, target:str='
 
     Parameters
     ----------
-    - 
+    - pdDataFrame (pd.DataFrame) :
+        - The Pandas dataframe to base the visualization off of
 
-    Raises
-    ------
-    - 
+    - col_for_comparison (str) :
+        - The column name intended to use for comparison to the "target" column
+
+    - target (str) :
+        - Default: attack
+        - The name of the target column name for comparison
 
     Returns
     -------
-    - 
+    - Violin plot of the top 2, bottom 2, and middle most distibution of the "target" tags with the "col_for_comparison"
     '''
     # Determine distribution of target
     counts = pdDataFrame[target].value_counts()
@@ -301,7 +306,84 @@ def vis_numerical(pdDataFrame:pd.DataFrame, col_for_comparison:str, target:str='
         hue=target,
         legend=False
     )
-    plt.title(f'Distribution Snapshot of {col_for_comparison}: Top, Middle, and Rare {target}')
+    plt.title(f'Numerical Signature: {col_for_comparison} vs {target}')
+    plt.tight_layout()
+    plt.show()
+
+
+def vis_categorical(pdDataFrame:pd.DataFrame, col_for_comparison: str, target: str = 'attack') -> None:
+    '''
+    About
+    -----
+    - Visualizes a heatmap of categorical data where the top 2, bottom 2, and middle most distributed attack types are displayed
+      along with the top 2, bottom 2, and middle col_for_comparison values
+
+    Parameters
+    ----------
+    - pdDataFrame (pd.DataFrame) :
+        - The Pandas dataframe to base the visualization off of
+
+    - col_for_comparison (str) :
+        - The column name intended to use for comparison to the "target" column
+
+    - target (str) :
+        - Default: attack
+        - The name of the target column name for comparison
+
+    Returns
+    -------
+    - Heatmap of the top 2, bottom 2, and middle most distibution of the "target" tags with the "col_for_comparison" with the top 2, bottom 2, and middle most values
+    '''
+    # Determine distribution of target
+    counts = pdDataFrame[target].value_counts()
+    total = len(pdDataFrame)
+    percentages = (counts / total * 100).round(2).to_dict()
+
+    # Define the top, middle, and most rare targets
+    top_2 = counts.index[:2]
+    middle = [counts.index[len(counts)//2]]
+    bottom_2 = counts.index[-2:]
+
+    # Create a sub_dataframe to expedite lookup
+    target_list = list(top_2) + list(middle) + list(bottom_2)
+    plot_df = pdDataFrame[pdDataFrame[target].isin(target_list)].copy()
+
+    # Create target label and distribution percentage
+    plot_df['Attack Type'] = plot_df[target].apply(lambda x: f"{x} ({percentages[x]}%)")
+
+    # Determine distribution of col_for_comparison
+    counts = plot_df[col_for_comparison].value_counts()
+    total = len(plot_df)
+    percentages = (counts / total * 100).round(2).to_dict()
+
+    # Define the top, middle, and most rare values
+    top_2_val = counts.index[:2]
+    middle_val = [counts.index[len(counts)//2]]
+    bottom_2_val = counts.index[-2:]
+
+    # Create a sub_dataframe to expedite lookup
+    target_list = list(top_2_val) + list(middle_val) + list(bottom_2_val)
+    plot_df = plot_df[plot_df[col_for_comparison].isin(target_list)].copy()
+
+    # Create value label and distribution percentage
+    plot_df[f'{col_for_comparison} Value'] = plot_df[col_for_comparison].apply(lambda x: f"{x} ({percentages[x]}%)")
+
+    # Acquire the crosstab
+    ct = pd.crosstab(plot_df['Attack Type'], plot_df[f'{col_for_comparison} Value'], normalize='index')
+
+    # Plot the heatmap
+    plt.figure(figsize=(12, 7))
+    sns.heatmap(
+        ct, 
+        annot=True, 
+        fmt=".2f", 
+        cmap="YlGnBu", 
+        cbar_kws={'label': 'Probability Density'}
+    )
+    
+    plt.title(f'Categorical Signature: {col_for_comparison} vs {target}')
+    plt.ylabel('Attack Type (Global Distribution %)')
+    plt.xlabel(f'{col_for_comparison} (Local Distribution %)')
     plt.tight_layout()
     plt.show()
 
