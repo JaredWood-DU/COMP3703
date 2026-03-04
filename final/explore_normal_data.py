@@ -27,8 +27,7 @@ FILE CONTENTS:
     - vis_target_dist
     - vis_numerical
     - vis_categorical
-    - vis_cramer
-    - vis_mutual_information
+    - vis_singular_association
 - Miscellaneous Helper Functions
     - _get_example_data
     - _get_markdown_data_dictionary
@@ -41,11 +40,13 @@ import os
 import numpy as np
 import pandas as pd
 
-# Reducing dataset
+from sklearn.feature_selection import mutual_info_classif
+from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy.stats import kruskal, chi2_contingency
 
 # ----- Global Variables --------------------------------------------------------------------------
 
@@ -55,162 +56,377 @@ import seaborn as sns
 # START Statistical Analysis Functions
 # =================================================================================================
 
-def analyze_chi_square():
+def analyze_chi_square(pdDataFrame:pd.DataFrame,
+                       feature:str,
+                       target:str='attack',
+                       p_threshold:float=0.05) -> dict:
     '''
     About
     -----
-    - Some placeholder function
+    - Applies scipy's chi2_contingency on a categorical feature and prints a color-coded statistic and p_value
+      where green is the p_value is less than p_threshold, red otherwise
+    - Returns a dictionary of all the information derived from the chi2_contingency function
+    - This is intended to statistically analyze CATEGORICAL features
 
     Parameters
     ----------
-    - ray_nn_train_func (Function) :
-        - The Ray-Train function logic for MLflow to wrap and log information from
+    - pdDataFrame (pd.DataFrame) :
+        - Pandas dataframe to apply the statistic test on
 
-    - framework (str) :
-        - Default: pytorch (Not implemented)
-        - String representation of the NN framework used (NOT IMPLEMENTED)
+    - feature (str) :
+        - The name of the feature (column) to be tested with "target"
+    
+    - target (str) :
+        - Default: attack
+        - The name of the target feature (column) to be tested with "feature"
 
-    Raises
-    ------
-    - RunTimeError
-        - Generally if anything should fail to log properly
-
-    - NotImplementedError
-        - Generally if something has not been implemented yet, particularly with framework types
+    - p_threshold (float) :
+        - Default: 0.05
+        - The value to determine if the statistic is statistically significant or not (p_val <= p_threshold means statistically significant)
 
     Returns
     -------
-    - Wraps the Ray-train function with MLflow logging logic to display results on MLflow UI
+    - A color-coded statistic and p_value where green means p_val <= p_threshold using scipy's chi2_contingency as a print statement
+    - A dictionary holding statistical test information
     '''
-    pass
+    # Setup and conduct test
+    contingency_table = pd.crosstab(pdDataFrame[feature], pdDataFrame[target])
+    stat, p_val, dof, expected = chi2_contingency(contingency_table)
+    
+    # Create dictionary of outputs
+    stat_results = {
+        'contingency_table': contingency_table,
+        'feature': feature,
+        'target': target,
+        'stat': stat,
+        'p_val': p_val,
+        'dof': dof,
+        'expected': expected
+    }
+
+    # Print off color-coded results
+    if p_val <= p_threshold:
+        print(f'\033[32m{feature} IS statistically significant with {target}!\033[0m\n'
+              f'\033[35mStatistic:\033[0m {stat:.4f}\n'
+              f'\033[35mP-Val:\033[0m {p_val:.4f}\n'
+              f'\033[35mP-Threshold:\033[0m {p_threshold:.4f}')
+    else:
+        print(f'\033[33m{feature} IS NOT statistically significant with {target}!\033[0m\n'
+              f'\033[35mStatistic:\033[0m {stat:.4f}\n'
+              f'\033[35mP-Val:\033[0m {p_val:.4f}\n'
+              f'\033[35mP-Threshold:\033[0m {p_threshold:.4f}')
+    
+    # Return statistical test results
+    return stat_results
 
 
-def analyze_kruskal_wallis():
+def analyze_kruskal_wallis(pdDataFrame:pd.DataFrame,
+                           feature:str,
+                           target:str='attack',
+                           p_threshold:float=0.05) -> dict:
     '''
     About
     -----
-    - Some placeholder function
+    - Applies scipy's kruskal wallis on a numerical feature and prints a color-coded statistic and p_value
+      where green is the p_value is less than p_threshold, red otherwise
+    - Returns a dictionary of all the information derived from the kruskal wallis function
+    - This is intended to statistically analyze NUMERICAL features
 
     Parameters
     ----------
-    - ray_nn_train_func (Function) :
-        - The Ray-Train function logic for MLflow to wrap and log information from
+    - pdDataFrame (pd.DataFrame) :
+        - Pandas dataframe to apply the statistic test on
 
-    - framework (str) :
-        - Default: pytorch (Not implemented)
-        - String representation of the NN framework used (NOT IMPLEMENTED)
+    - feature (str) :
+        - The name of the feature (column) to be tested with "target"
+    
+    - target (str) :
+        - Default: attack
+        - The name of the target feature (column) to be tested with "feature"
 
-    Raises
-    ------
-    - RunTimeError
-        - Generally if anything should fail to log properly
-
-    - NotImplementedError
-        - Generally if something has not been implemented yet, particularly with framework types
+    - p_threshold (float) :
+        - Default: 0.05
+        - The value to determine if the statistic is statistically significant or not (p_val <= p_threshold means statistically significant)
 
     Returns
     -------
-    - Wraps the Ray-train function with MLflow logging logic to display results on MLflow UI
+    - A color-coded statistic and p_value where green means p_val <= p_threshold using scipy's kruskal wallis as a print statement
+    - A dictionary holding statistical test information
     '''
-    pass
+    # Setup and conduct test
+    groups = [group[feature].values for name, group in pdDataFrame.groupby(target)]
+    stat, p_val = kruskal(*groups)
+    
+    # Create dictionary of outputs
+    stat_results = {
+        'feature': feature,
+        'target': target,
+        'stat': stat,
+        'p_val': p_val
+    }
+
+    # Print off color-coded results
+    if p_val <= p_threshold:
+        print(f'\033[32m{feature} IS statistically significant with {target}!\033[0m\n'
+              f'\033[35mStatistic:\033[0m {stat:.4f}\n'
+              f'\033[35mP-Val:\033[0m {p_val:.4f}\n'
+              f'\033[35mP-Threshold:\033[0m {p_threshold:.4f}\n')
+    else:
+        print(f'\033[33m{feature} IS NOT statistically significant with {target}!\033[0m\n'
+              f'\033[35mStatistic:\033[0m {stat:.4f}\n'
+              f'\033[35mP-Val:\033[0m {p_val:.4f}\n'
+              f'\033[35mP-Threshold:\033[0m {p_threshold:.4f}\n')
+    
+    # Return statistical test results
+    return stat_results
 
 # =================================================================================================
 # END Statistical Analysis Functions
 # START Associativity Functions
 # =================================================================================================
 
-def analyze_cramers():
+def analyze_cramers(pdDataFrame:pd.DataFrame,
+                    feature:str,
+                    target:str='attack',
+                    association_groups:list[float]=[0.5, 0.3, 0.1],
+                    analyze_chi_square_dict:dict=None) -> float:
     '''
     About
     -----
-    - Some placeholder function
+    - Applies the cramer's formula to determine the associativity of the categorical "feature" with "target" and prints a color-coded association and returns the result
+    - "association_groups" correlate with the color-coding of the print statement (green>=0.5, cyan>=0.3, yellow>=0.1, red>=0.0)
+    - This is intended to statistically analyze the associativity of a CATEGORICAL feature
 
     Parameters
     ----------
-    - ray_nn_train_func (Function) :
-        - The Ray-Train function logic for MLflow to wrap and log information from
+    - pdDataFrame (pd.DataFrame) :
+        - Pandas dataframe to apply the statistic test on
 
-    - framework (str) :
-        - Default: pytorch (Not implemented)
-        - String representation of the NN framework used (NOT IMPLEMENTED)
+    - feature (str) :
+        - The name of the feature (column) to be tested with "target"
+    
+    - target (str) :
+        - Default: attack
+        - The name of the target feature (column) to be tested with "feature"
+
+    - association_groups (list[float]) :
+        - Default: [0.5, 0.3, 0.1]
+        - WILL EXIT FUNCTION IF len(association_gropus) != 3
+        - This is generally to flag high/medium/low associativity
+        - Determines the color-coding of the print statement according to the produced result
+        - Please be aware that this assumes the level of associativity from highest to lowest, so please ensure the list is following the same pattern!
+        - GREEN>=0.5, CYAN>=0.3, YELLOW>=0.1, RED>=0.0
+
+    - anaylze_chi_square_dict (dict) :
+        - Default: None
+        - This is intended to be the dictionary output from the "analyze_chi_square" function to expedite intial variable derivations
+        - If None, it just obtains the contingency table and runs scipy's "chi2_contingency" function
 
     Raises
     ------
-    - RunTimeError
-        - Generally if anything should fail to log properly
-
-    - NotImplementedError
-        - Generally if something has not been implemented yet, particularly with framework types
+    - ValueError :
+        - If len(association_groups) != 3
 
     Returns
     -------
-    - Wraps the Ray-train function with MLflow logging logic to display results on MLflow UI
+    - A color-coded statistic where (green>=0.5, cyan>=0.3, yellow>=0.1, red>=0.0)
+    - The produced result (float) from application of cramer's formula
     '''
-    pass
+    # ----- Check Valid association_groups --------------------------------------------------------
+    if len(association_groups) != 3:
+        raise ValueError('\033[31mLength of association_groups is NOT equal to 3!\n'
+                         'Cancelling execution of analyze_cramers function!\033[0m')
+    
+    # ----- Obtain Initial Variables For Test -----------------------------------------------------
+    if analyze_chi_square_dict:
+        stat = analyze_chi_square_dict['stat']
+        n = analyze_chi_square_dict['contingency_table'].sum().sum()
+        phi2 = stat / n
+        r, k = analyze_chi_square_dict['contingency_table'].shape
+    else:
+        contingency_table = pd.crosstab(pdDataFrame[feature], pdDataFrame[target])
+        chi2 = chi2_contingency(contingency_table)[0]
+        n = contingency_table.sum().sum()
+        phi2 = chi2 / n
+        r, k = contingency_table.shape
+    
+    # ----- Conduct Test --------------------------------------------------------------------------
+    # Correct for bias
+    phi2corr = max(0, phi2 - ((k-1)*(r-1))/(n-1))    
+    rcorr = r - ((r-1)**2)/(n-1)
+    kcorr = k - ((k-1)**2)/(n-1)
+    
+    # produce result
+    result = np.sqrt(phi2corr / min((kcorr-1), (rcorr-1)))
+
+    # ----- Print/Return Results ------------------------------------------------------------------
+    # Green statement (High associativity)
+    if result >= association_groups[0]:
+        print(f'\033[32m{feature} has HIGH ASSOCIATION with {target}!')
+
+    # Cyan statement (Medium associativity)
+    elif result >= association_groups[1]:
+        print(f'\033[36m{feature} is MODERATE ASSOCIATION with {target}!')
+
+    # Yellow statement (Low associativity)
+    elif result >= association_groups[2]:
+        print(f'\033[33m{feature} has LOW ASSOCATION with {target}!')
+
+    # Red statement (No associativity)
+    else:
+        print(f'\033[31m{feature} has MINIMAL ASSOCATION with {target}!')
+
+    # Return result
+    return result
 
 
-def analyze_mutual_information():
+def analyze_mutual_information(pdDataFrame:pd.DataFrame,
+                               feature:str,
+                               target:str='attack',
+                               association_groups:list[float]=[0.5, 0.3, 0.1],
+                               n_samples=100000) -> dict:
     '''
     About
     -----
-    - Some placeholder function
+    - Applies the sklearn's mutual information function to determine the associativity of the numerical "feature" with "target" and prints a color-coded association and returns the result
+    - "association_groups" correlate with the color-coding of the print statement (green>=0.5, cyan>=0.3, yellow>=0.1, red>=0.0)
+    - This is intended to statistically analyze the associativity of a NUMERICAL feature
 
     Parameters
     ----------
-    - ray_nn_train_func (Function) :
-        - The Ray-Train function logic for MLflow to wrap and log information from
+    - pdDataFrame (pd.DataFrame) :
+        - Pandas dataframe to apply the statistic test on
 
-    - framework (str) :
-        - Default: pytorch (Not implemented)
-        - String representation of the NN framework used (NOT IMPLEMENTED)
+    - feature (str) :
+        - The name of the feature (column) to be tested with "target"
+    
+    - target (str) :
+        - Default: attack
+        - The name of the target feature (column) to be tested with "feature"
+
+    - association_groups (list[float]) :
+        - Default: [0.5, 0.3, 0.1]
+        - WILL EXIT FUNCTION IF len(association_gropus) != 3
+        - This is generally to flag high/medium/low associativity
+        - Determines the color-coding of the print statement according to the produced result
+        - Please be aware that this assumes the level of associativity from highest to lowest, so please ensure the list is following the same pattern!
+        - GREEN>=0.5, CYAN>=0.3, YELLOW>=0.1, RED>=0.0
+
+    - n_samples (int) :
+        - Default: 100000
+        - The number of samples to stratify over the "target" feature for testing
 
     Raises
     ------
-    - RunTimeError
-        - Generally if anything should fail to log properly
-
-    - NotImplementedError
-        - Generally if something has not been implemented yet, particularly with framework types
+    - ValueError :
+        - If len(association_groups) != 3
 
     Returns
     -------
-    - Wraps the Ray-train function with MLflow logging logic to display results on MLflow UI
+    - A color-coded statistic where (green>=0.5, cyan>=0.3, yellow>=0.1, red>=0.0)
+    - The produced result (dict) from application of sklearn's mutual information function
     '''
-    pass
+    # ----- Check Valid association_groups --------------------------------------------------------
+    if len(association_groups) != 3:
+        raise ValueError('\033[31mLength of association_groups is NOT equal to 3!\n'
+                         'Cancelling execution of analyze_cramers function!\033[0m')
+    
+    # ----- Setup and Perform MI Test -------------------------------------------------------------
+    y_all = pdDataFrame[target]
+    
+    # Prepare X (feature) and y (target)
+    X_sample, _, y_sample, _ = train_test_split(pdDataFrame[[feature]], 
+                                                y_all, 
+                                                train_size=n_samples, 
+                                                stratify=y_all, 
+                                                random_state=42)
+    
+    # Encode "target"
+    le_y = LabelEncoder()
+    y_encoded = le_y.fit_transform(y_sample)
+    
+    # Compute mutual information
+    mi_score = mutual_info_classif(X_sample, y_encoded, discrete_features=[False], random_state=42)
+    
+    # ----- Print and Return Results --------------------------------------------------------------
+    # Create result dictionary
+    results = {
+        'feature': feature,
+        'target': target,
+        'mi-score': mi_score[0]
+    }
+
+    # Green statement (High associativity)
+    if mi_score[0] >= association_groups[0]:
+        print(f'\033[32m{feature} has HIGH ASSOCIATION with {target}!')
+
+    # Cyan statement (Medium associativity)
+    elif mi_score[0] >= association_groups[1]:
+        print(f'\033[36m{feature} is MODERATE ASSOCIATION with {target}!')
+
+    # Yellow statement (Low associativity)
+    elif mi_score[0] >= association_groups[2]:
+        print(f'\033[33m{feature} has LOW ASSOCATION with {target}!')
+
+    # Red statement (No associativity)
+    else:
+        print(f'\033[31m{feature} has MINIMAL ASSOCATION with {target}!')
+
+    # Return result
+    return results
 
 # =================================================================================================
 # END Associativity Functions
 # START Dual-Purpose Function
 # =================================================================================================
 
-def analyze_statistical_significance_and_associativity():
+def analyze_statistical_significance_and_associativity(pdDataFrame:pd.DataFrame,
+                                                       feature:str,
+                                                       target:str='attack'):
     '''
     About
     -----
-    - Some placeholder function
+    - Runs through a categorical or numerical statistical and associative analysis along with visuals
+    - Uses the following functions:
+        - analyze_chi_square
+        - vis_categorical
+        - analyze_cramers
+        - vis_singular_association
+        - analyze_kruskal_wallis
+        - vis_numerical
+        - analyze_mutual_information
 
     Parameters
     ----------
-    - ray_nn_train_func (Function) :
-        - The Ray-Train function logic for MLflow to wrap and log information from
+    - pdDataFrame (pd.DataFrame) :
+        - The Pandas dataframe to perform the analysis and visuals on
 
-    - framework (str) :
-        - Default: pytorch (Not implemented)
-        - String representation of the NN framework used (NOT IMPLEMENTED)
+    - feature (str) :
+        - The feature (column) name to be analyzed with "target"
 
-    Raises
-    ------
-    - RunTimeError
-        - Generally if anything should fail to log properly
-
-    - NotImplementedError
-        - Generally if something has not been implemented yet, particularly with framework types
+    - target (str) :
+        - The target feature name to be analyzed with "feature
 
     Returns
     -------
-    - Wraps the Ray-train function with MLflow logging logic to display results on MLflow UI
+    - A complete statistical and associative analysis along with visuals for a single categorical/numerical feature
     '''
-    pass
+    # Determine if categorical feature
+    is_object_feature = (pdDataFrame[feature].dtype == 'object') or (pdDataFrame[feature].dtype == 'str')
+
+    # Run categorical-based analysis
+    if is_object_feature:
+        results = analyze_chi_square(pdDataFrame, feature, target)
+        vis_categorical(pdDataFrame, feature, target)
+        score = analyze_cramers(pdDataFrame, feature, target, analyze_chi_square_dict=results)
+        vis_singular_association(feature, score, 'Cramers')
+
+    # Run numerical-based analysis
+    else:
+        results = analyze_kruskal_wallis(pdDataFrame, feature, target)
+        vis_numerical(pdDataFrame, feature, target)
+        score = analyze_mutual_information(pdDataFrame, feature, target)
+        vis_singular_association(feature, score['mi-score'])
 
 # =================================================================================================
 # END Dual-Purpose Function
@@ -384,6 +600,67 @@ def vis_categorical(pdDataFrame:pd.DataFrame, col_for_comparison: str, target: s
     plt.title(f'Categorical Signature: {col_for_comparison} vs {target}')
     plt.ylabel('Attack Type (Global Distribution %)')
     plt.xlabel(f'{col_for_comparison} (Global Distribution %)')
+    plt.tight_layout()
+    plt.show()
+
+
+def vis_singular_association(feature_name:str,
+                             score:float,
+                             metric_type:str = "Mutual Information") -> None:
+    '''
+    About
+    -----
+    - Visualizes the association score of a single feature against the target using a bar graph
+    - Categorizes the strength into High, Medium, Low, or Minimal tiers
+
+    Parameters
+    ----------
+    - feature_name (str) :
+        - Name of the feature being tested for association to some target feature
+
+    - score (float) :
+        - Score of either the analyze_cramers or analyze_mutual_information functions
+
+    - metric_type (str) :
+        - The type of evaluation used (Ideally Cramers or Mutual Information)
+
+    Returns
+    -------
+    - Bar graph visualization of the associativity of "feature_name"
+    '''
+    # ----- Determine Association Color -----------------------------------------------------------
+    if score >= 0.5:
+        tier, color = "High", "#2ecc71"
+    elif score >= 0.3:
+        tier, color = "Moderate", "#00FFFF" 
+    elif score >= 0.1:
+        tier, color = "Low", "#f1c40f"
+    else:
+        tier, color = "Minimal", "#e74c3c"
+
+    # ----- Setup and Show Visualization ----------------------------------------------------------
+    # Visualization size
+    plt.figure(figsize=(8, 3))
+    
+    # Background bar
+    plt.barh([feature_name], [1.0], color='#ecf0f1', label='Scale Range')
+
+    # Score bar
+    plt.barh([feature_name], [score], color=color, label=f'{tier} Associativity')
+
+    # Annotations and visual-aids
+    plt.text(score + 0.02, 0, f"{score:.4f} ({tier})", va='center', fontweight='bold')
+    plt.axvline(x=0.1, color='black', linestyle='--', alpha=0.3)
+    plt.axvline(x=0.3, color='black', linestyle='--', alpha=0.3)
+    plt.axvline(x=0.5, color='black', linestyle='--', alpha=0.3)
+
+    # Create labels and ranges
+    plt.title(f"{metric_type} Analysis: {feature_name}", loc='left', fontsize=12)
+    plt.xlim(0, 1.0)
+    plt.xlabel("Association Score (0.0 - 1.0)")
+    plt.legend(loc='lower right')
+
+    # Show visualization
     plt.tight_layout()
     plt.show()
 
