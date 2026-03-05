@@ -35,20 +35,21 @@ FILE CONTENTS:
     - _get_markdown_data_dictionary
 '''
 # ----- Imports -----------------------------------------------------------------------------------
-# Pathing and renaming files
-import os
-
 # Databasing
 import numpy as np
 import pandas as pd
 
-from sklearn.feature_selection import mutual_info_classif
+# Database splitting, encoding, scaling
 from sklearn.preprocessing import LabelEncoder, RobustScaler
 from sklearn.model_selection import train_test_split
 
+# Statistical testing
+from scipy.stats import kruskal, chi2_contingency
+from sklearn.feature_selection import mutual_info_classif
+
+# Visualizations
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.stats import kruskal, chi2_contingency
 
 # ----- Global Variables --------------------------------------------------------------------------
 # NA
