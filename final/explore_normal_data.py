@@ -28,6 +28,8 @@ FILE CONTENTS:
     - vis_numerical
     - vis_categorical
     - vis_singular_association
+- Preprocess Functions
+    - preprocess_normal_data
 - Miscellaneous Helper Functions
     - _get_example_data
     - _get_markdown_data_dictionary
@@ -41,7 +43,7 @@ import numpy as np
 import pandas as pd
 
 from sklearn.feature_selection import mutual_info_classif
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, RobustScaler
 from sklearn.model_selection import train_test_split
 
 import matplotlib.pyplot as plt
@@ -49,7 +51,7 @@ import seaborn as sns
 from scipy.stats import kruskal, chi2_contingency
 
 # ----- Global Variables --------------------------------------------------------------------------
-
+# NA
 
 # =================================================================================================
 # END File Overview, Imports, Global Variables
@@ -686,6 +688,63 @@ def vis_singular_association(feature_name:str,
 
 # =================================================================================================
 # START Visualization Functions
+# END Preprocess Functions
+# =================================================================================================
+
+def preprocess_normal_data(pdDataFrame:pd.DataFrame) -> pd.DataFrame:
+    '''
+    About
+    -----
+    - Reduces, encodes, and scales the normal dataframe based off of analysis in "explore_normal_data.ipynb"
+
+    Parameters
+    ----------
+    - pdDataFrame (pd.DataFrame) :
+        - Original Pandas dataframe to reduce further in preparation for model training
+
+    Returns
+    -------
+    - reduced_df (pd.DataFrame) :
+        - Reduced, encoded, and scaled Pandas dataframe based off of analysis in "explore_normal_data.ipynb"
+    '''
+    # Reduce df to identified columns to keep
+    cols_to_keep = [
+        'in_bytes',
+        'out_bytes',
+        'flow_duration_milliseconds',
+        'duration_in',
+        'min_ttl',
+        'max_ttl',
+        'longest_flow_pkt',
+        'shortest_flow_pkt',
+        'max_ip_pkt_len',
+        'src_to_dst_avg_throughput',
+        'num_pkts_up_to_128_bytes',
+        'num_pkts_128_to_256_bytes',
+        'tcp_win_max_in',
+        'attack'
+    ]
+    reduced_df = pdDataFrame[cols_to_keep]
+
+    # Encode the Target
+    le = LabelEncoder()
+    reduced_df['target'] = le.fit_transform(reduced_df['attack'])
+    
+    # Apply log transform large value cols first
+    log_cols = ['in_bytes', 'out_bytes', 'src_to_dst_avg_throughput', 'flow_duration_milliseconds']
+    for col in log_cols:
+        # np.log1p handles the log(x+1) to avoid -inf on zero values
+        reduced_df[col] = np.log1p(reduced_df[col].clip(upper=1e12)) 
+
+    # Apply Robust Scaling to everything else
+    scaler = RobustScaler()
+    numerical_features = reduced_df.select_dtypes(include=[np.number]).columns.drop('target')
+    reduced_df[numerical_features] = scaler.fit_transform(reduced_df[numerical_features])
+    
+    return reduced_df
+
+# =================================================================================================
+# START Preprocess Functions
 # END Miscellaneous Helper Functions
 # =================================================================================================
 

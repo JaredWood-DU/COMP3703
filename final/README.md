@@ -64,9 +64,9 @@ You can also use `pip` with the `requirements.txt` file. Using pip does not mana
 
 - [x] Acquire Dataset
 - [x] Clean Dataset
-- [ ] Exploration of Original Dataset
+- [x] Exploration of Original Dataset
 - [ ] Prepare Dataset
-	- [ ] Apply Encoding, normalization, feature engineering where necessary from above exploration
+	- [x] Apply Encoding, normalization, feature engineering where necessary from above exploration
 	- [ ] Implement Complex Network Features
 		- [ ] Determine if iGraph is faster than networkX
 		- [ ] Determine feasability of an ideal datasize for feature engineering
