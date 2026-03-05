@@ -1,11 +1,12 @@
 '''
 FILE OVERVIEW:
-- 
+- Underlying code intended for use in explore_complex_networks.ipynb to keep notebook cleaner
+- Consists of various functions intended to derive complex network information to engineer into the dataset
 
 =================================================
 
 MISC COMMENTS:
-- 
+- NA
 
 =================================================
 
@@ -17,10 +18,24 @@ FILE CONTENTS:
 - Main Function
 '''
 # ----- Imports -----------------------------------------------------------------------------------
+# Databasing
+import numpy as np
+import pandas as pd
 
+# Networking
+import networkx as nx
+import igraph as ig
+
+# Database splitting, encoding, scaling
+from sklearn.preprocessing import LabelEncoder, RobustScaler
+from sklearn.model_selection import train_test_split
+
+# Visualizations
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # ----- Global Variables --------------------------------------------------------------------------
-
+# NA
 
 # =================================================================================================
 # END File Overview, Imports, Global Variables
