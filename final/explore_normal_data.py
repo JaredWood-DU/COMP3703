@@ -382,7 +382,8 @@ def analyze_mutual_information(pdDataFrame:pd.DataFrame,
 
 def analyze_statistical_significance_and_associativity(pdDataFrame:pd.DataFrame,
                                                        feature:str,
-                                                       target:str='attack'):
+                                                       target:str='attack',
+                                                       is_object_feature:bool=False):
     '''
     About
     -----
@@ -407,13 +408,14 @@ def analyze_statistical_significance_and_associativity(pdDataFrame:pd.DataFrame,
     - target (str) :
         - The target feature name to be analyzed with "feature
 
+    - is_object_feature (bool) :
+        - Default: False
+        - Whether or not the feature to analyze is meant to be analyzed as a categorical (object/str) or numerical (int/float) way
+
     Returns
     -------
     - A complete statistical and associative analysis along with visuals for a single categorical/numerical feature
     '''
-    # Determine if categorical feature
-    is_object_feature = (pdDataFrame[feature].dtype == 'object') or (pdDataFrame[feature].dtype == 'str')
-
     # Run categorical-based analysis
     if is_object_feature:
         results = analyze_chi_square(pdDataFrame, feature, target)
@@ -508,6 +510,24 @@ def vis_numerical(pdDataFrame:pd.DataFrame, col_for_comparison:str, target:str='
     # Create a sub_dataframe to expedite lookup
     target_list = list(top_2) + list(middle) + list(bottom_2)
     plot_df = pdDataFrame[pdDataFrame[target].isin(target_list)].copy()
+
+    # Prevent unreasonably large numbers that will cause errors
+    plot_df[col_for_comparison] = plot_df[col_for_comparison].clip(upper=1e12)
+    
+    # Sanity check for nans and infs
+    plot_df = plot_df.replace([np.inf, -np.inf], np.nan).dropna(subset=[col_for_comparison])
+
+    # Interpret zeros for log scale (Crashes otherwise)
+    # We add 1 to all values so that 0 becomes log(1) = 0. 
+    if (plot_df[col_for_comparison] <= 0).any():
+        plot_df[col_for_comparison] = plot_df[col_for_comparison] + 1.0
+        title_suffix = " (Log Scale: x+1 offset applied)"
+    else:
+        title_suffix = ""
+
+    # Handle extremely close to 0 float values
+    plot_df = plot_df[np.isfinite(plot_df[col_for_comparison])]
+    plot_df = plot_df[plot_df[col_for_comparison] > 1e-5]
 
     # Create target label and distribution percentage
     plot_df['Attack Type'] = plot_df[target].apply(lambda x: f"{x} ({percentages[x]}%)")
