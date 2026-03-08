@@ -68,9 +68,9 @@ You can also use `pip` with the `requirements.txt` file. Using pip does not mana
 - [ ] Prepare Dataset
 	- [x] Apply Encoding, normalization, feature engineering where necessary from above exploration
 	- [ ] Implement Complex Network Features
-		- [ ] Determine if iGraph is faster than networkX
-		- [ ] Determine feasability of an ideal datasize for feature engineering
-		- [ ] Determine if graph is directed or undirected
+		- [x] Determine if iGraph is faster than networkX
+		- [x] Determine feasability of an ideal datasize for feature engineering
+		- [x] Determine if graph is directed or undirected
 		- [ ] Derive Laplacian Matrix
 		- [ ] Engineer 1st and 2nd Eigenvalues (Defines underlying network architecture.  Theoretically, establishes a sort of baseline normalcy in activity)
 		- [ ] Engineer 1st and 2nd Eigenvectors (Theoretically should denote inconsistent entries with other nodes, basically if this node potentially is malicious.  In other words, should denote a unique footprint for every entry that can be compared to the baseline normalcy)
