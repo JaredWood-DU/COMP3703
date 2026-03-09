@@ -19,6 +19,15 @@ FILE CONTENTS:
     - vis_original_star_graph
     - vis_timing
     - vis_big_o
+    - vis_bad_ips
+- Feature Engineering Functions
+    - generate_reduced_graph_df
+    - remove_bad_ips
+    - generate_graph_ids
+    - generate_intensity_and_zscores
+    - generate_complex_network_information
+- Preprocessing Functions
+    - preprocess_complex_data
 - Helper Functions
     - get_nx_graph_generation_time
     - get_ig_graph_generation_time
@@ -29,6 +38,9 @@ FILE CONTENTS:
     - calculate_big_o
 '''
 # ----- Imports -----------------------------------------------------------------------------------
+# File Detection
+import os
+
 # Databasing
 import numpy as np
 import pandas as pd
@@ -38,7 +50,7 @@ import networkx as nx
 import igraph as ig
 
 # Database splitting, encoding, scaling
-from sklearn.preprocessing import LabelEncoder, RobustScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
 
 # Visualizations
@@ -48,6 +60,9 @@ import seaborn as sns
 
 # Timing
 from time import time
+
+# Matrix Manipulation
+from scipy.sparse.linalg import eigsh
 
 # ----- Global Variables --------------------------------------------------------------------------
 # NA
@@ -250,8 +265,7 @@ def vis_original_star_graph(pdDataFrame:pd.DataFrame,
         edge_data = G_full.get_edge_data(max_hub, neighbor)
         star_subgraph.add_edge(max_hub, neighbor, **edge_data)
 
-    # Verification: In a star graph, the number of edges must equal the number of neighbors
-    # and the diameter must be 2.
+    # Verifiy that this is a star graph
     if len(star_subgraph.edges()) > 0:
         diam = nx.diameter(star_subgraph)
         print(f"Verified Topology: {'Star' if diam == 2 else 'Complex'} (Diam={diam})")
@@ -441,9 +455,484 @@ def vis_big_o(pdDataFrame:pd.DataFrame,
     plt.show()
     pass
 
+
+def vis_bad_ips(pdDataFrame:pd.DataFrame,
+                target:str = 'attack') -> None:
+    '''
+    About
+    -----
+    - Visualizes the bad IPs as a graph to determine if they have any value or not (0.0.0.0)
+
+    Parameters
+    ----------
+    - pdDataFrame (pd.DataFrame) :
+        - The Pandas dataframe to base the visualization off of
+    - target (str) :    
+        - The name of the categorical target identifier
+
+    Returns
+    -------
+    - Visualization of the bad IPs as a graph
+    '''
+    # ----- Create Sub-Dataframe ------------------------------------------------------------------
+    bad_ips_df = pdDataFrame[(pdDataFrame['source_ip'] == '0.0.0.0') | (pdDataFrame['destination_ip'] == '0.0.0.0')].head(100)
+    
+    if bad_ips_df.empty:
+        return print("\033[32mNo 0.0.0.0 addresses found in this sample!\033[0m")
+
+    # ----- Generate Graph ------------------------------------------------------------------------
+    G = nx.from_pandas_edgelist(
+        bad_ips_df, 
+        source='source_ip', 
+        target='destination_ip', 
+        edge_attr=target,
+        create_using=nx.Graph()
+    )
+
+    # ----- Define Node Colors --------------------------------------------------------------------
+    # Initialize variables
+    node_colors = []
+    node_labels = {}
+    degrees = dict(G.degree())
+
+    for node in G.nodes():
+        # Bad-IP Logic
+        if node == '0.0.0.0':
+            node_colors.append('#2ecc71')
+            node_labels[node] = f"{node}\n(k={degrees[node]})"
+
+        # Blue if benign, Red if malicious
+        else:
+            incident = G.edges(node, data=True)
+            is_malicious = any(str(e[2][target]).lower() != 'benign' for e in incident)
+            node_colors.append('#e74c3c' if is_malicious else '#3498db')
+            node_labels[node] = ""
+
+    # ----- Visualize Data ------------------------------------------------------------------------
+    # Visualization size and graph type
+    plt.figure(figsize=(14, 9))
+    pos = nx.spring_layout(G, k=0.5, seed=3703)
+
+    # Draw edges and nodes
+    nx.draw_networkx_edges(G, pos, width=1.0, edge_color='#bdc3c7', alpha=0.5)
+    nx.draw_networkx_nodes(G, pos, node_size=800, node_color=node_colors, edgecolors='black')
+    
+    # Draw labels
+    label_pos = {k: [v[0], v[1] + 0.08] for k, v in pos.items()}
+    nx.draw_networkx_labels(G, label_pos, labels=node_labels, font_size=9, font_weight='bold')
+
+    # Draw legend
+    green_dot = mlines.Line2D([], [], color='#2ecc71', marker='o', linestyle='None', markersize=10, label='Bad IP: (0.0.0.0)')
+    red_dot = mlines.Line2D([], [], color='#e74c3c', marker='o', linestyle='None', markersize=10, label='Malicious')
+    blue_dot = mlines.Line2D([], [], color='#3498db', marker='o', linestyle='None', markersize=10, label='Benign')
+    plt.legend(handles=[green_dot, red_dot, blue_dot], loc='upper right', title="Security Profile")
+
+    plt.title("0.0.0.0 IP Connectivity", fontsize=14)
+    plt.axis('off')
+    plt.show()
+
 # =================================================================================================
 # END Visualization Functions
-# START Helper Function
+# START Feature Engineering Functions
+# =================================================================================================
+
+def generate_reduced_graph_df(pdDataFrame: pd.DataFrame,
+                              target: str = 'attack',
+                              data_file: str = 'datasets/initial_complex.parquet') -> pd.DataFrame:
+    '''
+    About
+    -----
+    - Reduces network flow data into a graph-linked feature set
+    - Collapses repeated connections into weighted edges
+    - Engineers topological binary features (Star, Chain, Bridge)
+    - Creates a parquet file based on "data_file"
+
+    Parameters
+    ----------
+    - pdDataFrame (pd.DataFrame) :
+        - The Pandas dataframe to reduce the information on
+    - target (str) :
+        - Default: attack
+        - The name of the categorical attack identifier
+    - data_file (str) :
+        - Default: datasets/initial_complex.parquet
+        - The name of the reduced data file to check for first before creation
+
+    Returns
+    -------
+    - pd.DataFrame
+        - The initial reduced dataframe for complex network feature engineering
+    '''
+    # ----- Initial Check If Dataset Already Exists -----------------------------------------------
+    if os.path.exists(data_file):
+        print(f'\033[32m{data_file} already exists! No need to recreate!\033[0m')
+        return pd.read_parquet(data_file) 
+
+    print(f'\033[33m{data_file} not detected. Attempting to create {data_file}...\033[0m')
+
+    # Rename columns for clarity in graph representation
+    df = pdDataFrame.rename(columns={
+        'ipv4_src_addr': 'source_ip',
+        'ipv4_dst_addr': 'destination_ip'
+    })
+
+    # ----- Grouping and Weight Aggregation -------------------------------------------------------
+    # We group by src, dst, and target to preserve the structural dual-nature of compromised IPs
+    reduced_df = df.groupby(['source_ip', 'destination_ip', target]).agg({
+        'in_bytes': 'sum',
+        'out_bytes': 'sum',
+        'duration_in': 'mean'
+    }).reset_index()
+
+    # Create the continuous 'edge_weight' feature
+    reduced_df['edge_weight'] = reduced_df['in_bytes'] + reduced_df['out_bytes'] + reduced_df['duration_in']
+
+    # ----- Engineer Graph IDs --------------------------------------------------------------------
+    # Generate the initial graph to find connected components (islands)
+    G_temp = nx.from_pandas_edgelist(reduced_df, 'source_ip', 'destination_ip')
+    components = list(nx.connected_components(G_temp))
+    
+    # Map nodes to their Graph IDs
+    node_to_gid = {node: i for i, nodes in enumerate(components) for node in nodes}
+    reduced_df['graph_id'] = reduced_df['source_ip'].map(node_to_gid)
+
+    # ----- Engineer Topological IDs --------------------------------------------------------------
+    # Initialize binary features for ML/NN training
+    reduced_df['is_star_graph'] = 0
+    reduced_df['is_chain_graph'] = 0
+    reduced_df['is_bridge_link'] = 0
+
+    # Iterate through each unique graph island to calculate diameter and bridges
+    for gid in reduced_df['graph_id'].unique():
+        subset = reduced_df[reduced_df['graph_id'] == gid]
+        
+        # Create iGraph instance for fast structural calculations
+        edges = subset[['source_ip', 'destination_ip']].values
+        g_ig = ig.Graph.TupleList(edges, directed=False)
+        
+        # A. Filter: Remove standalone nodes (Diameter = 1)
+        diam = g_ig.diameter()
+        if diam <= 1:
+            reduced_df = reduced_df[reduced_df['graph_id'] != gid]
+            continue
+
+        # B. Geometry Classifiers
+        is_star = 1 if diam == 2 else 0
+        is_chain = 1 if diam > 2 else 0
+        
+        # C. Bridge Link Detection (Cut-edges)
+        bridge_indices = g_ig.bridges()
+        
+        # Apply labels back to the dataframe subset
+        idx = reduced_df[reduced_df['graph_id'] == gid].index
+        reduced_df.loc[idx, 'is_star_graph'] = is_star
+        reduced_df.loc[idx, 'is_chain_graph'] = is_chain
+        
+        # Mark specific edges as bridge links
+        for b_idx in bridge_indices:
+            edge = g_ig.es[b_idx]
+            u, v = g_ig.vs[edge.source]['name'], g_ig.vs[edge.target]['name']
+            
+            # Locate the specific edge in the original dataframe (checking both directions)
+            mask = (reduced_df['graph_id'] == gid) & (
+                ((reduced_df['source_ip'] == u) & (reduced_df['destination_ip'] == v)) | 
+                ((reduced_df['source_ip'] == v) & (reduced_df['destination_ip'] == u))
+            )
+            reduced_df.loc[mask, 'is_bridge_link'] = 1
+
+    # ----- Final Slimming ------------------------------------------------------------------------
+    final_cols = ['source_ip',
+                  'destination_ip',
+                  'edge_weight', 
+                  'is_star_graph',
+                  'is_chain_graph',
+                  'is_bridge_link',
+                  target]
+    
+    final_df = reduced_df[final_cols].reset_index(drop=True)
+    
+    # Save to Parquet
+    final_df.to_parquet(data_file)
+    print(f'\033[32mSuccessfully created {data_file}!\033[0m')
+    
+    return final_df
+
+
+def remove_bad_ips(pdDataFrame:pd.DataFrame) -> pd.DataFrame:
+    '''
+    About
+    -----
+    - Removes source and destination IPs that are 0.0.0.0 to prevent structural noise.
+
+    Parameters
+    ----------
+    - pdDataFrame (pd.DataFrame) :
+        - The Pandas dataframe to remove 0.0.0.0 IPs from
+
+    Returns
+    -------
+    - pd.DataFrame
+        - A Pandas dataframe with all source and destination IPs of 0.0.0.0
+    '''
+    initial_count = len(pdDataFrame)
+    
+    # Filter out 0.0.0.0 from both source and destination
+    df_clean = pdDataFrame[
+        (pdDataFrame['source_ip'] != '0.0.0.0') & 
+        (pdDataFrame['destination_ip'] != '0.0.0.0')
+    ].copy()
+    
+    # Print off how many were removed
+    removed = initial_count - len(df_clean)
+    print(f"\033[32mRemoved {removed} rows containing 0.0.0.0.\033[0m")
+    
+    return df_clean
+
+
+def generate_graph_ids(pdDataFrame:pd.DataFrame) -> pd.DataFrame:
+    '''
+    About
+    -----
+    - Identifies connected sub-graphs and assigns a graph ID to each entry denoting which connected graph the node belongs to
+
+    Parameters
+    ----------
+    - pdDataFrame (pd.DataFrame) :
+        - The Pandas dataframe to derive graph IDs from
+
+    Returns
+    -------
+    - pd.DataFrame
+        - The new Pandas dataframe with graph IDs attached to them
+    '''
+    # Build a temporary undirected graph for expediency
+    G_temp = nx.from_pandas_edgelist(pdDataFrame, 'source_ip', 'destination_ip')
+    
+    # Find the connected sub-graphs
+    components = list(nx.connected_components(G_temp))
+    
+    # Map nodes of the connected sub-graphs to a graph ID
+    node_to_gid = {}
+    for gid, nodes in enumerate(components):
+        for node in nodes:
+            node_to_gid[node] = gid
+            
+    # Append the graph ID to every entry
+    pdDataFrame['graph_id'] = pdDataFrame['source_ip'].map(node_to_gid)
+    
+    return pdDataFrame
+
+
+def generate_intensity_and_zscore(pdDataFrame:pd.DataFrame,
+                                  target:str = 'attack') -> pd.DataFrame:
+    '''
+    About
+    -----
+    - Calculates a baseline edge_weight score and std for star and non-star graphs with only benign attack type entries
+      then determines the respective edge_weight ratio and zscore for every entry compared to this baseline
+    - Creates the following new features
+        - baseline_edge_weight_ratio
+        - baseline_edge_weight_zscore
+
+    Parameters
+    ----------
+    - pdDataFrame (pd.DataFrame) :  
+        - The Pandas dataframe to generate the new features on
+    - target (str) :
+        - The name of the categorical attack type identifier
+
+    Returns
+    -------
+    - pd.DataFrame
+        - The new Pandas dataframe with the new information
+    '''
+    # Create temp benign only df
+    benign_df = pdDataFrame[pdDataFrame[target].str.lower() == 'benign']
+    
+    # Generate baseline edge weight
+    baseline_stats = benign_df.groupby('is_star_graph')['edge_weight'].agg(['mean', 'std']).rename(
+        columns={'mean': 'baseline_mean', 'std': 'baseline_std'}
+    )
+
+    # Temporarily add baseline stats
+    pdDataFrame = pdDataFrame.merge(baseline_stats, on='is_star_graph', how='left')
+
+    # Establish intensity of the edge weight with the baseline edge weight
+    pdDataFrame['baseline_edge_weight_ratio'] = pdDataFrame['edge_weight'] / pdDataFrame['baseline_mean']
+
+    # Establish zscore of the edge weight
+    pdDataFrame['baseline_edge_weight_zscore'] = (pdDataFrame['edge_weight'] - pdDataFrame['baseline_mean']) / pdDataFrame['baseline_std']
+
+    # Remove temp baseline stats and return
+    cols_to_drop = ['baseline_mean', 'baseline_std']
+    return pdDataFrame.drop(columns=cols_to_drop)
+
+
+def generate_complex_network_information(pdDataFrame:pd.DataFrame) -> pd.DataFrame:
+    '''
+    About
+    -----
+    - Generates the desired complex network information per unique graph_id and appends this as new features
+    - Features Generated:
+        - eigen_1 (The first eigenvalue)
+        - eigen_2 (The second eigenvalue)
+        - v1_src (The source node's component in the first eigenvector)
+        - v2_src (The source node's component in the second eigenvector)
+        - src_pagerank (The source node's PageRank)
+        - dst_pagerank (The destination node's PageRank)
+        - spectral_gap (The gap between the first and second eigenvalue)
+        - convergence_steps (Number of iterations to reach spectral convergence)
+
+    Parameters
+    ----------
+    - pdDataFrame (pd.DataFrame)
+        - The Pandas dataframe to derive the complex network information on
+
+    Returns
+    -------
+    - pd.DataFrame
+        - The new Pandas dataframe with the complex network information
+    '''
+    # ----- Initial Setup -------------------------------------------------------------------------
+    # Initialize the new features
+    for col in ['eigen_1', 'eigen_2', 'v1_src', 'v2_src', 'src_pagerank', 'dst_pagerank', 'convergence_steps']:
+        pdDataFrame[col] = 0.0
+
+    # Establish the unique graph IDs
+    unique_gids = pdDataFrame['graph_id'].unique()
+
+    # ----- Generate Complex Network Information --------------------------------------------------
+    for gid in unique_gids:
+        # Create a subset of ONLY this graph ID
+        subset = pdDataFrame[pdDataFrame['graph_id'] == gid]
+        
+        # Check if this graph is a star graph to determine convergence tracking
+        is_star = subset['is_star_graph'].iloc[0] == 1
+        
+        # Setup the nodes, edges, and weights
+        nodes = list(set(subset['source_ip']) | set(subset['destination_ip']))
+        node_map = {name: i for i, name in enumerate(nodes)}
+        edges = [(node_map[s], node_map[d]) for s, d in zip(subset['source_ip'], subset['destination_ip'])]
+        weights = subset['edge_weight'].astype(float).values
+        
+        # Build the directed graph
+        g_dir = ig.Graph(n=len(nodes), edges=edges, directed=True, edge_attrs={'weight': weights})
+        
+        # Derive PageRanks
+        pr_scores = g_dir.pagerank(weights='weight')
+        pr_lookup = dict(zip(nodes, pr_scores))
+        
+        # Transform directed to undirected (NECESSARY FOR EIGENVALUES)
+        g_und = g_dir.as_undirected(mode="collapse", combine_edges="sum")
+        
+        # Derive Eigenvalues
+        adj_sparse = g_und.get_adjacency_sparse(attribute='weight')
+        
+        # Initialize loop-specific variables
+        eigval_1, eigval_2, n_iter = 0.0, 0.0, 0
+        v1_lookup, v2_lookup = {node: 0.0 for node in nodes}, {node: 0.0 for node in nodes}
+        
+        try:
+            # Scipy Matrix derivation method
+            if adj_sparse.shape[0] > 2:
+                # return_eigenvectors=True is required to capture the actual structural vectors
+                vals, vecs = eigsh(adj_sparse, k=2, which='LM', return_eigenvectors=True)
+                
+                # Sort to ensure e1 is always the principal eigenvalue
+                sorted_idx = np.argsort(np.abs(vals))
+                eigval_1, eigval_2 = np.abs(vals[sorted_idx[-1]]), np.abs(vals[sorted_idx[-2]])
+                
+                # Extract raw eigenvector components for mapping
+                v1_raw = vecs[:, sorted_idx[-1]]
+                v2_raw = vecs[:, sorted_idx[-2]]
+                
+                # Create lookups for the absolute values (mapping nodes to their energy hierarchy)
+                v1_lookup = dict(zip(nodes, np.abs(v1_raw)))
+                v2_lookup = dict(zip(nodes, np.abs(v2_raw)))
+                
+                # Derive steps to convergence ONLY for non-star graphs
+                if not is_star:
+                    n_iter = g_und.vcount()
+            
+            # Standard math for simple matricies
+            else:
+                eigval_1 = np.linalg.norm(adj_sparse.toarray()) / np.sqrt(2)
+                eigval_2 = 0.0
+        except:
+            eigval_1, eigval_2, n_iter = 0.0, 0.0, 0
+            
+        # Map results back to respective information
+        idx = subset.index
+        pdDataFrame.loc[idx, 'eigen_1'] = eigval_1
+        pdDataFrame.loc[idx, 'eigen_2'] = eigval_2
+        pdDataFrame.loc[idx, 'v1_src'] = pdDataFrame.loc[idx, 'source_ip'].map(v1_lookup)
+        pdDataFrame.loc[idx, 'v2_src'] = pdDataFrame.loc[idx, 'source_ip'].map(v2_lookup)
+        pdDataFrame.loc[idx, 'convergence_steps'] = n_iter if not is_star else 0
+        pdDataFrame.loc[idx, 'src_pagerank'] = pdDataFrame.loc[idx, 'source_ip'].map(pr_lookup)
+        pdDataFrame.loc[idx, 'dst_pagerank'] = pdDataFrame.loc[idx, 'destination_ip'].map(pr_lookup)
+        
+    # Create the spectral_gap feature
+    pdDataFrame['spectral_gap'] = (pdDataFrame['eigen_1'] - pdDataFrame['eigen_2']).abs()
+    
+    # Return new dataframe
+    return pdDataFrame
+
+# =================================================================================================
+# END Feature Engineering Functions
+# START Preprocessing Functions
+# =================================================================================================
+
+def preprocess_complex_data(pdDataFrame: pd.DataFrame) -> pd.DataFrame:
+    '''
+    About
+    -----
+    - Applies log-scaling and normalization to spectral and topological features to ensure convergence in Neural Network training
+
+    Parameters
+    ----------
+    - pdDataFrame (pd.DataFrame) :
+        - The Pandas dataframe to normalize and scale on
+
+    Returns
+    -------
+    - pd.DataFrame
+        - The new Pandas dataframe that is normalized and scaled
+    '''
+    # ----- Define Features And Their Respective Scaler/Transform ---------------------------------
+    # Log transforms (They have massive ranges (10^0 to 10^8))
+    log_cols = [
+        'eigen_1', 'eigen_2', 'spectral_gap', 
+        'convergence_steps', 'edge_weight', 'baseline_edge_weight_ratio'
+    ]
+    
+    # Linear scaling (They are already small decimals or balanced ratios)
+    minmax_cols = ['src_pagerank', 'dst_pagerank']
+    
+    # Standard scaling (Generally for centering purposes)
+    z_cols = ['baseline_edge_weight_zscore', 'v1_src', 'v2_src']
+
+    # ----- Perform Scaling/Transfroms ------------------------------------------------------------
+    # Sanity check before scaling
+    pdDataFrame[log_cols + minmax_cols + z_cols] = pdDataFrame[log_cols + minmax_cols + z_cols].replace([np.inf, -np.inf], np.nan).fillna(0)
+
+    # Apply log scaling
+    for col in log_cols:
+        if col in pdDataFrame.columns:
+            pdDataFrame[col] = np.log1p(pdDataFrame[col].astype(float))
+    
+    # Apply linear scaling
+    scaler_minmax = MinMaxScaler()
+    pdDataFrame[minmax_cols] = scaler_minmax.fit_transform(pdDataFrame[minmax_cols])
+
+    # Apply standard scaling
+    scaler_std = StandardScaler()
+    pdDataFrame[log_cols + z_cols] = scaler_std.fit_transform(pdDataFrame[log_cols + z_cols])
+
+    return pdDataFrame
+
+# =================================================================================================
+# END Preprocessing Functions
+# START Helper Functions
 # =================================================================================================
 
 def get_nx_graph_generation_time(pdDataFrame:pd.DataFrame,
@@ -838,5 +1327,5 @@ def calculate_big_o(graph_generation_results:dict)-> tuple[float, float]:
     return o_exp, intercept
 
 # =================================================================================================
-# END Helper Function
+# END Helper Functions
 # =================================================================================================

@@ -71,10 +71,12 @@ You can also use `pip` with the `requirements.txt` file. Using pip does not mana
 		- [x] Determine if iGraph is faster than networkX
 		- [x] Determine feasability of an ideal datasize for feature engineering
 		- [x] Determine if graph is directed or undirected
-		- [ ] Derive Laplacian Matrix
-		- [ ] Engineer 1st and 2nd Eigenvalues (Defines underlying network architecture.  Theoretically, establishes a sort of baseline normalcy in activity)
-		- [ ] Engineer 1st and 2nd Eigenvectors (Theoretically should denote inconsistent entries with other nodes, basically if this node potentially is malicious.  In other words, should denote a unique footprint for every entry that can be compared to the baseline normalcy)
-		- [ ] Explore feasability of PageRank (Random Walks for convergence detection.  Theoretically, benign should be clustered together and the more "stealthy" an attack is, the further they are from this cluster.  DDoS likely will be the closest furthest away attack and BotNets will likely be the furthest isolated point from this cluster)
+		- [x] Slim-down dataset initially if necessary
+		- [x] Determine 0.0.0.0 use-case
+		- [x] Generate baseline information
+		- [x] Engineer 1st and 2nd Eigenvalues (Defines underlying network architecture.  Theoretically, establishes a sort of baseline normalcy in activity)
+		- [x] Engineer 1st and 2nd Eigenvectors (Theoretically should denote inconsistent entries with other nodes, basically if this node potentially is malicious.  In other words, should denote a unique footprint for every entry that can be compared to the baseline normalcy)
+		- [x] Explore feasability of PageRank (Random Walks for convergence detection.  Theoretically, benign should be clustered together and the more "stealthy" an attack is, the further they are from this cluster.  DDoS likely will be the closest furthest away attack and BotNets will likely be the furthest isolated point from this cluster)
 		- [ ] Encode and normalize information where necessary (Large values like bytes may need to be normalized as the eigenvalues will likely be only single digits)
 - [ ] Select Models
 - [ ] Train and Test Models
