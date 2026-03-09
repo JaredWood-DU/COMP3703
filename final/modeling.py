@@ -13,7 +13,8 @@ MISC COMMENTS:
 FILE CONTENTS:
 - File Overview, Imports, Global Variables
 - Model Definition Functions
-    - thing1
+    - get_ml_model
+    - get_nn_model
 - Model Evaluation Functions
 - Model Training Functions
 - Misc/Helper Functions
@@ -33,6 +34,9 @@ import igraph as ig
 # Database splitting, encoding, scaling
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split, GroupKFold
+from sklearn.ensemble import RandomForestClassifier
+import tensorflow as tf
+from tensorflow.keras import layers, models
 
 # Visualizations
 import matplotlib.pyplot as plt
@@ -52,34 +56,74 @@ from scipy.sparse.linalg import eigsh
 # START Model Definition Functions
 # =================================================================================================
 
-def thing1():
+def get_ml_model(trees:int=100) -> RandomForestClassifier:
     '''
     About
     -----
-    - Some placeholder function
+    - Creates and returns a basic sklearn RandomForestClassifier for model training
 
     Parameters
     ----------
-    - ray_nn_train_func (Function) :
-        - The Ray-Train function logic for MLflow to wrap and log information from
-
-    - framework (str) :
-        - Default: pytorch (Not implemented)
-        - String representation of the NN framework used (NOT IMPLEMENTED)
-
-    Raises
-    ------
-    - RunTimeError
-        - Generally if anything should fail to log properly
-
-    - NotImplementedError
-        - Generally if something has not been implemented yet, particularly with framework types
+    - trees (int) :
+        - Default: 100
+        - The number of decision trees to be created where each tree is randomly trained on a subset of the data.
+          Essentially, this is like creating a voting block of whether or not something is significant during decisions
 
     Returns
     -------
-    - Wraps the Ray-train function with MLflow logging logic to display results on MLflow UI
+    - RandomForestClassifier
+        - An sklearn.ensemble RandomForesetClassifier ML model
     '''
-    pass
+    rfc_model = RandomForestClassifier(
+        n_estimators=trees,      # This is just the number of "trees" we are creating
+        class_weight='balanced', # This generally solves the imbalance issue
+        max_features='sqrt',     # This generally solves the bias issue
+        random_state=3703        # This is to ensure reproducibility
+    )
+    return rfc_model
+
+
+def get_nn_model(num_features_to_train:int) -> models.Sequential:
+    '''
+    About
+    -----
+    - Creates and returns a simple forward-pass Neural Network for model training
+    - This definition is to closely resemble the RandomForestClassifer as much as possible via the forward-pass
+
+    Parameters
+    ----------
+    - num_features_to_train (int) :
+        - The number of features being used from the dataset to train the NN on
+
+    Returns
+    -------
+    - models.Sequential
+        - A tensorflow.keras NN model
+    '''
+    # ----- Define NN Structure -------------------------------------------------------------------
+    nn_model = models.Sequential([
+
+        # Input layer (Starting point of decision making)
+        layers.Input(shape=(num_features_to_train,)),
+
+        # Small hidden layers to prevent "brute force" memorization
+        layers.Dense(32, activation='relu'),
+        layers.Dense(16, activation='relu'),
+
+        # Output layer (using Sigmoid for binary or Softmax for multiclass)
+        layers.Dense(1, activation='sigmoid') 
+    ])
+    
+    # ----- Define Backpropagation Methodology ----------------------------------------------------
+    nn_model.compile(
+        optimizer='adam',                       # How weights/biases work
+        loss='binary_crossentropy',             # How significant was the incorrectness
+        metrics=['accuracy',                    # The metrics to optimize
+                 tf.keras.metrics.Precision(),
+                 tf.keras.metrics.Recall()]
+    )
+
+    return nn_model
 
 # =================================================================================================
 # END Model Definition Functions
