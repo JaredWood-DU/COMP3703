@@ -25,7 +25,7 @@ FILE CONTENTS:
 - Main Function
 """
 # ----- Imports -----------------------------------------------------------------------------------
-# Pathing and renaming files
+# Pathing and renaming files 
 import os
 
 # Databasing
