@@ -51,12 +51,10 @@ import igraph as ig
 
 # Database splitting, encoding, scaling
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.model_selection import train_test_split
 
 # Visualizations
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
-import seaborn as sns
 
 # Timing
 from time import time

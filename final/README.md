@@ -65,9 +65,9 @@ You can also use `pip` with the `requirements.txt` file. Using pip does not mana
 - [x] Acquire Dataset
 - [x] Clean Dataset
 - [x] Exploration of Original Dataset
-- [ ] Prepare Dataset
+- [x] Prepare Dataset
 	- [x] Apply Encoding, normalization, feature engineering where necessary from above exploration
-	- [ ] Implement Complex Network Features
+	- [x] Implement Complex Network Features
 		- [x] Determine if iGraph is faster than networkX
 		- [x] Determine feasability of an ideal datasize for feature engineering
 		- [x] Determine if graph is directed or undirected
@@ -77,7 +77,7 @@ You can also use `pip` with the `requirements.txt` file. Using pip does not mana
 		- [x] Engineer 1st and 2nd Eigenvalues (Defines underlying network architecture.  Theoretically, establishes a sort of baseline normalcy in activity)
 		- [x] Engineer 1st and 2nd Eigenvectors (Theoretically should denote inconsistent entries with other nodes, basically if this node potentially is malicious.  In other words, should denote a unique footprint for every entry that can be compared to the baseline normalcy)
 		- [x] Explore feasability of PageRank (Random Walks for convergence detection.  Theoretically, benign should be clustered together and the more "stealthy" an attack is, the further they are from this cluster.  DDoS likely will be the closest furthest away attack and BotNets will likely be the furthest isolated point from this cluster)
-		- [ ] Encode and normalize information where necessary (Large values like bytes may need to be normalized as the eigenvalues will likely be only single digits)
+		- [x] Encode and normalize information where necessary (Large values like bytes may need to be normalized as the eigenvalues will likely be only single digits)
 - [ ] Select Models
 - [ ] Train and Test Models
 	- [ ] Baseline Model (Vanilla training of model)
