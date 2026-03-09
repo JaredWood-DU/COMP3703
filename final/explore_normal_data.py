@@ -530,7 +530,7 @@ def vis_numerical(pdDataFrame:pd.DataFrame, col_for_comparison:str, target:str='
 
     # Handle extremely close to 0 float values
     plot_df = plot_df[np.isfinite(plot_df[col_for_comparison])]
-    plot_df = plot_df[plot_df[col_for_comparison] > 1e-5]
+    plot_df = plot_df[plot_df[col_for_comparison] > 1e-30]
 
     # Create target label and distribution percentage
     plot_df['Attack Type'] = plot_df[target].apply(lambda x: f"{x} ({percentages[x]}%)")
