@@ -73,6 +73,8 @@ dependencies:
       - idna==3.11
       - igraph==1.0.0
       - joblib==1.5.3
+      - kagglehub==1.0.0
+      - kagglesdk==0.1.16
       - keras==3.13.2
       - kiwisolver==1.5.0
       - libclang==18.1.1
@@ -91,6 +93,7 @@ dependencies:
       - pillow==12.1.1
       - protobuf==4.25.8
       - pyparsing==3.3.2
+      - pyyaml==6.0.3
       - requests==2.32.5
       - rich==14.3.3
       - scikit-learn==1.8.0
@@ -103,6 +106,7 @@ dependencies:
       - termcolor==3.3.0
       - texttable==1.7.0
       - threadpoolctl==3.6.0
+      - tqdm==4.67.3
       - urllib3==2.6.3
       - werkzeug==3.1.6
       - wrapt==2.1.2

@@ -25,6 +25,8 @@ jedi @ file:///home/conda/feedstock_root/build_artifacts/jedi_1733300866624/work
 joblib==1.5.3
 jupyter_client @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_jupyter_client_1767954655/work
 jupyter_core @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_jupyter_core_1760643864/work
+kagglehub==1.0.0
+kagglesdk==0.1.16
 keras==3.13.2
 kiwisolver==1.5.0
 libclang==18.1.1
@@ -55,6 +57,7 @@ pure_eval @ file:///home/conda/feedstock_root/build_artifacts/pure_eval_17335694
 Pygments @ file:///home/conda/feedstock_root/build_artifacts/pygments_1750615794071/work
 pyparsing==3.3.2
 python-dateutil @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_python-dateutil_1751104122/work
+PyYAML==6.0.3
 pyzmq @ file:///Users/runner/miniforge3/conda-bld/bld/rattler-build_pyzmq_1757387126/work
 requests==2.32.5
 rich==14.3.3
@@ -71,6 +74,7 @@ termcolor==3.3.0
 texttable==1.7.0
 threadpoolctl==3.6.0
 tornado @ file:///Users/runner/miniforge3/conda-bld/tornado_1765836571726/work
+tqdm==4.67.3
 traitlets @ file:///home/conda/feedstock_root/build_artifacts/traitlets_1733367359838/work
 typing_extensions @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_typing_extensions_1756220668/work
 urllib3==2.6.3
