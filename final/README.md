@@ -78,13 +78,13 @@ You can also use `pip` with the `requirements.txt` file. Using pip does not mana
 		- [x] Engineer 1st and 2nd Eigenvectors (Theoretically should denote inconsistent entries with other nodes, basically if this node potentially is malicious.  In other words, should denote a unique footprint for every entry that can be compared to the baseline normalcy)
 		- [x] Explore feasability of PageRank (Random Walks for convergence detection.  Theoretically, benign should be clustered together and the more "stealthy" an attack is, the further they are from this cluster.  DDoS likely will be the closest furthest away attack and BotNets will likely be the furthest isolated point from this cluster)
 		- [x] Encode and normalize information where necessary (Large values like bytes may need to be normalized as the eigenvalues will likely be only single digits)
-- [ ] Select Models
-- [ ] Train and Test Models
-	- [ ] Baseline Model (Vanilla training of model)
-	- [ ] Best Tabular-Centric Model (No Complex Network Features)
-	- [ ] Best Network Model (Only Complex Network Features)
+- [x] Select Models
+- [x] Train and Test Models
+	- [x] Baseline Model (Vanilla training of model)
+	- [x] Best Tabular-Centric Model (No Complex Network Features)
+	- [x] Best Network Model (Only Complex Network Features)
 	- [ ] Best Hybrid Model (Both Tabular and Network Features)
-- [ ] Observe Key Differences
+- [x] Observe Key Differences
 - [ ] Create Visualizations
 - [ ] Create Final Notebook Presentation
 
