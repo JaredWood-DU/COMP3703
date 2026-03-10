@@ -779,7 +779,8 @@ def generate_complex_network_information(pdDataFrame:pd.DataFrame) -> pd.DataFra
         - src_pagerank (The source node's PageRank)
         - dst_pagerank (The destination node's PageRank)
         - spectral_gap (The gap between the first and second eigenvalue)
-        - convergence_steps (Number of iterations to reach spectral convergence)
+        - global_convergence_steps (Total iterations for the entire graph to reach spectral stability)
+        - node_convergence_steps (Iterations for the specific source node to reach spectral stability)
 
     Parameters
     ----------
@@ -793,7 +794,11 @@ def generate_complex_network_information(pdDataFrame:pd.DataFrame) -> pd.DataFra
     '''
     # ----- Initial Setup -------------------------------------------------------------------------
     # Initialize the new features
-    for col in ['eigen_1', 'eigen_2', 'v1_src', 'v2_src', 'src_pagerank', 'dst_pagerank', 'convergence_steps']:
+    new_cols = [
+        'eigen_1', 'eigen_2', 'v1_src', 'v2_src', 'src_pagerank', 'dst_pagerank', 
+        'global_convergence_steps', 'node_convergence_steps'
+    ]
+    for col in new_cols:
         pdDataFrame[col] = 0.0
 
     # Establish the unique graph IDs
@@ -827,12 +832,14 @@ def generate_complex_network_information(pdDataFrame:pd.DataFrame) -> pd.DataFra
         adj_sparse = g_und.get_adjacency_sparse(attribute='weight')
         
         # Initialize loop-specific variables
-        eigval_1, eigval_2, n_iter = 0.0, 0.0, 0
+        eigval_1, eigval_2 = 0.0, 0.0
         v1_lookup, v2_lookup = {node: 0.0 for node in nodes}, {node: 0.0 for node in nodes}
+        node_conv_lookup = {node: 0 for node in nodes}
+        global_steps = 0
         
         try:
             # Scipy Matrix derivation method
-            if adj_sparse.shape[0] > 2:
+            if adj_sparse.shape[0] >= 2:
                 # return_eigenvectors=True is required to capture the actual structural vectors
                 vals, vecs = eigsh(adj_sparse, k=2, which='LM', return_eigenvectors=True)
                 
@@ -844,20 +851,49 @@ def generate_complex_network_information(pdDataFrame:pd.DataFrame) -> pd.DataFra
                 v1_raw = vecs[:, sorted_idx[-1]]
                 v2_raw = vecs[:, sorted_idx[-2]]
                 
-                # Create lookups for the absolute values (mapping nodes to their energy hierarchy)
+                # Create lookups for the absolute values
                 v1_lookup = dict(zip(nodes, np.abs(v1_raw)))
                 v2_lookup = dict(zip(nodes, np.abs(v2_raw)))
                 
-                # Derive steps to convergence ONLY for non-star graphs
-                if not is_star:
-                    n_iter = g_und.vcount()
+                # ----- Derive Convergence Steps (Global and Node-Based) --------------------------
+                n = adj_sparse.shape[0]
+                v_curr = np.ones(n) / np.sqrt(n)
+                epsilon = 1e-6
+                max_iter = 500000  # Increased for better resolution
+                damp = 0.85        # Damping factor to ensure stability
+                
+                node_steps = np.zeros(n, dtype=int)
+                converged_mask = np.zeros(n, dtype=bool)
+
+                for t in range(1, max_iter + 1):
+                    # Power Step with Damping
+                    v_next = (damp * (adj_sparse @ v_curr)) + ((1 - damp) * v_curr)
+                    
+                    norm = np.linalg.norm(v_next)
+                    if norm == 0: break
+                    v_next = v_next / norm
+                    
+                    # Identify entries that have converged
+                    # We use a slightly more relaxed check for "Stability"
+                    newly_converged = (np.abs(v_next - v_curr) < epsilon) & (~converged_mask)
+                    node_steps[newly_converged] = t
+                    converged_mask[newly_converged] = True
+                    
+                    v_curr = v_next
+                    global_steps = t
+                    
+                    if converged_mask.all(): break
+                
+                # Fill non-converged with the max
+                node_steps[~converged_mask] = max_iter
+                node_conv_lookup = dict(zip(nodes, node_steps))
             
-            # Standard math for simple matricies
+            # Standard math for simple matrices
             else:
                 eigval_1 = np.linalg.norm(adj_sparse.toarray()) / np.sqrt(2)
                 eigval_2 = 0.0
         except:
-            eigval_1, eigval_2, n_iter = 0.0, 0.0, 0
+            eigval_1, eigval_2 = 0.0, 0.0
             
         # Map results back to respective information
         idx = subset.index
@@ -865,7 +901,8 @@ def generate_complex_network_information(pdDataFrame:pd.DataFrame) -> pd.DataFra
         pdDataFrame.loc[idx, 'eigen_2'] = eigval_2
         pdDataFrame.loc[idx, 'v1_src'] = pdDataFrame.loc[idx, 'source_ip'].map(v1_lookup)
         pdDataFrame.loc[idx, 'v2_src'] = pdDataFrame.loc[idx, 'source_ip'].map(v2_lookup)
-        pdDataFrame.loc[idx, 'convergence_steps'] = n_iter if not is_star else 0
+        pdDataFrame.loc[idx, 'global_convergence_steps'] = global_steps if not is_star else 0
+        pdDataFrame.loc[idx, 'node_convergence_steps'] = pdDataFrame.loc[idx, 'source_ip'].map(node_conv_lookup)
         pdDataFrame.loc[idx, 'src_pagerank'] = pdDataFrame.loc[idx, 'source_ip'].map(pr_lookup)
         pdDataFrame.loc[idx, 'dst_pagerank'] = pdDataFrame.loc[idx, 'destination_ip'].map(pr_lookup)
         
@@ -896,11 +933,42 @@ def preprocess_complex_data(pdDataFrame: pd.DataFrame) -> pd.DataFrame:
     - pd.DataFrame
         - The new Pandas dataframe that is normalized and scaled
     '''
+    # ----- Apply Target Encoding -----------------------------------------------------------------
+    # Map the 'attack' strings to the same 0-20 IDs from the normal dataset
+    attack_mapping = {'scanning': 16,
+                      'benign': 2,
+                      'ddos': 5,
+                      'dos': 6,
+                      'xss': 20,
+                      'reconnaissance': 15,
+                      'password': 13,
+                      'injection': 11,
+                      'brute_force': 4,
+                      'fuzzers': 8,
+                      'bot': 3,
+                      'infilteration': 10,
+                      'generic': 9,
+                      'backdoor': 1,
+                      'exploits': 7,
+                      'ransomware': 14,
+                      'mitm': 12,
+                      'theft': 18,
+                      'shellcode': 17,
+                      'analysis': 0,
+                      'worms': 19
+                    }
+    pdDataFrame['target'] = pdDataFrame['attack'].map(attack_mapping)
+
     # ----- Define Features And Their Respective Scaler/Transform ---------------------------------
     # Log transforms (They have massive ranges (10^0 to 10^8))
     log_cols = [
-        'eigen_1', 'eigen_2', 'spectral_gap', 
-        'convergence_steps', 'edge_weight', 'baseline_edge_weight_ratio'
+        'eigen_1',
+        'eigen_2',
+        'spectral_gap', 
+        'global_convergence_steps', 
+        'node_convergence_steps',
+        'edge_weight',
+        'baseline_edge_weight_ratio'
     ]
     
     # Linear scaling (They are already small decimals or balanced ratios)
