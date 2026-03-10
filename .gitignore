@@ -1,9 +1,5 @@
-/lectures
-*/resources
-*/complexNetworkArticles
-*/datasets
-*.csv
-*.parquet
-*.keras
-*.requirements.txt
+lectures
+resources
+complexNetworkArticles
+CloudWatch_Traffic_Web_Attack.csv
 template*
