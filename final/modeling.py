@@ -404,6 +404,7 @@ def train_nn(preparation_dict:dict,
     report_df = pd.merge(report_df, mapping_df, on='target', how='left')
     report_df['attack_name'] = report_df['attack_name'].fillna(report_df['target'])
     report_df = report_df.set_index('attack_name')
+    report_df.to_parquet(metrics_save_name)
 
     print(f'\033[32mNeural Network metrics successfully saved as {metrics_save_name}!\033[0m')
     
