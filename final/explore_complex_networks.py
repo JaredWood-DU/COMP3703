@@ -189,7 +189,7 @@ def vis_original_overall_graph(pdDataFrame:pd.DataFrame,
 
     # ----- Visualize Data ------------------------------------------------------------------------
     # Visualization size and graph framing type
-    plt.figure(figsize=(14, 9))
+    plt.figure(figsize=(7, 7))
     pos = nx.kamada_kawai_layout(G)
     
     # Draw edges
