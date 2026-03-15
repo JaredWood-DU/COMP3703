@@ -175,15 +175,15 @@ def plot_complex_graph_multiclass(df, g_id, attack_mapping=ATTACK_MAPPING, node_
 
 def plot_key_comparison():
     # Data extracted from your metrics (Standardized for the 6 key narrative classes)
-    labels = ['Worms', 'Ransomware', 'Benign', 'Theft', 'Scanning', 'DDoS']
+    labels = ['Benign', 'Worms', 'Ransomware', 'Theft', 'Scanning', 'DDoS']
 
     # Recall Data (Ability to catch the attack)
-    rec_tab = [0.000, 0.588, 0.598, 0.750, 0.937, 0.974]
-    rec_comp = [1.000, 1.000, 0.999, 1.000, 0.767, 0.300]
+    rec_tab = [0.598, 0.000, 0.588, 0.750, 0.937, 0.974]
+    rec_comp = [0.999, 1.000, 1.000, 1.000, 0.767, 0.300]
 
     # Precision Data (Reliability of the alert)
-    prec_tab = [0.000, 0.833, 0.995, 0.028, 0.485, 0.993]
-    prec_comp = [1.000, 1.000, 0.996, 1.000, 0.889, 0.429]
+    prec_tab = [0.995, 0.000, 0.833, 0.028, 0.485, 0.993]
+    prec_comp = [0.996, 1.000, 1.000, 1.000, 0.889, 0.429]
 
     x = np.arange(len(labels))
     width = 0.35
@@ -201,7 +201,7 @@ def plot_key_comparison():
     rects2 = ax1.bar(x + width/2, rec_comp, width, label='Complex (Graph)', color=recall_color, edgecolor='black', linewidth=0.5)
 
     ax1.set_ylabel('Recall Score', fontweight='bold', fontsize=12)
-    ax1.set_title('Detection Coverage: How many attacks did we catch?', fontsize=14, pad=15, fontweight='bold')
+    ax1.set_title('Attack Understanding: How well can we differentiate between non-attacks and attacks', fontsize=14, pad=15, fontweight='bold')
     ax1.set_ylim(0, 1.2)
     ax1.legend(loc='upper left', frameon=True)
     ax1.grid(axis='y', linestyle='--', alpha=0.3)
